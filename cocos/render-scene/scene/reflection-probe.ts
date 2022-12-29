@@ -123,7 +123,7 @@ export class ReflectionProbe {
 
     /**
      * @en Set probe type,cube or planar.
-     * @zh 设置探针类型，cube或者planar
+     * @zh 设置探针类型，cube或者planar。
      */
     set probeType (value: number) {
         this._probeType = value;
@@ -132,13 +132,9 @@ export class ReflectionProbe {
         return this._probeType;
     }
 
-    get resolution () {
-        return this._resolution;
-    }
-
     /**
-     * @en set render texture size
-     * @zh 设置渲染纹理大小
+     * @en set render texture size.
+     * @zh 设置渲染纹理大小。
      */
     set resolution (value: number) {
         if (value !== this._resolution) {
@@ -147,6 +143,10 @@ export class ReflectionProbe {
             });
         }
         this._resolution = value;
+    }
+
+    get resolution () {
+        return this._resolution;
     }
 
     /**
@@ -198,6 +198,10 @@ export class ReflectionProbe {
         return this._size;
     }
 
+    /**
+     * @en Sets the baked cubemap.
+     * @zh 设置烘焙的cubemap。
+     */
     set cubemap (val: TextureCube | null) {
         this._cubemap = val;
     }
@@ -208,19 +212,23 @@ export class ReflectionProbe {
 
     /**
      * @en The node of the probe.
-     * @zh probe绑定的节点
+     * @zh probe绑定的节点。
      */
     get node () {
         return this._node!;
     }
 
+    /**
+     * @en Virtual camera of the reflection probe.
+     * @zh 反射探针的虚拟相机。
+     */
     get camera () {
         return this._camera!;
     }
 
     /**
      * @en Refresh the objects that use this probe.
-     * @zh 刷新使用该probe的物体
+     * @zh 刷新使用该probe的物体。
      */
     set needRefresh (value: boolean) {
         this._needRefresh = value;
@@ -230,6 +238,10 @@ export class ReflectionProbe {
         return this._needRefresh;
     }
 
+    /**
+     * @en Is rendering required.
+     * @zh 是否需要渲染。
+     */
     set needRender (value: boolean) {
         this._needRender = value;
     }
@@ -237,10 +249,18 @@ export class ReflectionProbe {
         return this._needRender;
     }
 
+    /**
+     * @en Boundingbox of the reflection probe.
+     * @zh 反射探针的包围盒。
+     */
     get boundingBox () {
         return this._boundingBox;
     }
 
+    /**
+     * @en Virtual camera node.
+     * @zh 虚拟相机的node。
+     */
     set cameraNode (node: Node) {
         this._cameraNode = node;
     }
@@ -249,8 +269,8 @@ export class ReflectionProbe {
     }
 
     /**
-     * @en Reflection probe cube mode preview sphere
-     * @zh 反射探针cube模式的预览小球
+     * @en Reflection probe cube mode preview sphere.
+     * @zh 反射探针cube模式的预览小球。
      * @engineInternal
      */
     set previewSphere (val: Node) {
@@ -262,8 +282,8 @@ export class ReflectionProbe {
     }
 
     /**
-     * @en Reflection probe planar mode preview plane
-     * @zh 反射探针Planar模式的预览平面
+     * @en Reflection probe planar mode preview plane.
+     * @zh 反射探针Planar模式的预览平面。
      */
     set previewPlane (val: Node) {
         this._previewPlane = val;
@@ -301,8 +321,8 @@ export class ReflectionProbe {
     }
 
     /**
-     * @en Render real-time planar reflection textures
-     * @zh 渲染实时平面反射贴图
+     * @en Render real-time planar reflection textures.
+     * @zh 渲染实时平面反射贴图。
      * @param sourceCamera render planar reflection for this camera
      */
     public renderPlanarReflection (sourceCamera: Camera) {
@@ -317,6 +337,10 @@ export class ReflectionProbe {
         this._needRender = true;
     }
 
+    /**
+     * @en Switch reflection probe type cube or planar.
+     * @zh 切换反射探针类型cube或者planar。
+     */
     public switchProbeType (type: number, sourceCamera: Camera | null) {
         if (type === ProbeType.CUBE) {
             this._needRender = false;
@@ -325,10 +349,18 @@ export class ReflectionProbe {
         }
     }
 
+    /**
+     * @en Get the reflection probe id.
+     * @zh 获取反射探针id。
+     */
     public getProbeId () {
         return this._probeId;
     }
 
+    /**
+     * @en Render area for renderflow.
+     * @zh 渲染区域用于renderflow的流程。
+     */
     public renderArea (): Vec2 {
         if (this._probeType === ProbeType.PLANAR) {
             return new Vec2(this.realtimePlanarTexture!.width, this.realtimePlanarTexture!.height);
@@ -360,16 +392,35 @@ export class ReflectionProbe {
             this.realtimePlanarTexture = null;
         }
     }
+
+    /**
+     * @en Triggered when the reflection probe component is enabled.
+     * @zh 反射探针组件启用时触发。
+     */
     public enable () {
     }
+
+    /**
+     * @en Triggered when the reflection probe component is disabled.
+     * @zh 反射探针组件禁用时触发。
+     */
     public disable () {
     }
 
+    /**
+     * @en Update camera direction.
+     * @zh 更新相机方向。
+     * @param model face index of the cubemap
+     */
     public updateCameraDir (faceIdx: number) {
         this.cameraNode.setRotationFromEuler(cameraDir[faceIdx]);
         this.camera.update(true);
     }
 
+    /**
+     * @en Update the boundingBox.
+     * @zh 更新BoundingBox。
+     */
     public updateBoundingBox () {
         if (this.node) {
             this.node.updateWorldTransform();
@@ -378,6 +429,10 @@ export class ReflectionProbe {
         }
     }
 
+    /**
+     * @en Used to determine rendertexture's framebuffer is added to the render queue of the custom render pipeline.
+     * @zh 用于判断rendertexture的framebuffer是否被添加到自定义渲染管线的渲染队列。
+     */
     public hasFrameBuffer (framebuffer: Framebuffer) {
         if (this.bakedCubeTextures.length === 0) return false;
         for (let i = 0; i < this.bakedCubeTextures.length; i++) {

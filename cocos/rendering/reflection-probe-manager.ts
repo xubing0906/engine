@@ -81,6 +81,10 @@ export class ReflectionProbeManager {
         }
     }
 
+    /**
+     * @en Select the model using plane reflection.
+     * @zh 筛选使用平面反射的模型。
+     */
     public filterModelsForPlanarReflection () {
         if (this._probes.length === 0) return;
         const scene = director.getScene();
@@ -97,6 +101,10 @@ export class ReflectionProbeManager {
         }
     }
 
+    /**
+     * @en Clear the binding reflection map.
+     * @zh 清除绑定的反射贴图。
+     */
     public clearPlanarReflectionMap (probe: ReflectionProbe) {
         for (const entry of this._usePlanarModels.entries()) {
             if (entry[1] === probe) {
@@ -109,6 +117,10 @@ export class ReflectionProbeManager {
         }
     }
 
+    /**
+     * @en Register the reflection probe.
+     * @zh 注册反射探针。
+     */
     public register (probe: ReflectionProbe) {
         const index = this._probes.indexOf(probe);
         if (index === -1) {
@@ -116,6 +128,10 @@ export class ReflectionProbeManager {
         }
     }
 
+    /**
+     * @en Unregister the reflection probe.
+     * @zh 取消注册的反射探针。
+     */
     public unregister (probe: ReflectionProbe) {
         for (let i = 0; i < this._probes.length; i++) {
             if (this._probes[i] === probe) {
@@ -128,6 +144,10 @@ export class ReflectionProbeManager {
         }
     }
 
+    /**
+     * @en Whether there are reflection probes with the same id.
+     * @zh 是否存在相同id的反射探针。
+     */
     public exists (probeId: number): boolean {
         if (this._probes.length === 0) return false;
         for (let i = 0; i < this._probes.length; i++) {
@@ -138,6 +158,10 @@ export class ReflectionProbeManager {
         return false;
     }
 
+    /**
+     * @en Generate a new reflection probe id.
+     * @zh 生成一个新的反射探针id。
+     */
     public getNewReflectionProbeId () {
         let probeId = 0;
         // eslint-disable-next-line no-constant-condition
@@ -150,14 +174,26 @@ export class ReflectionProbeManager {
         }
     }
 
+    /**
+     * @en Get all reflection probes in the scene.
+     * @zh 获取场景中所有的反射探针。
+     */
     public getProbes (): ReflectionProbe[] {
         return this._probes;
     }
 
+    /**
+     * @en Clear all reflection probes in the scene.
+     * @zh 清除场景中所有的反射探针。
+     */
     public clearAll () {
         this._probes = [];
     }
 
+    /**
+     * @en Index reflection probe with camera.
+     * @zh 根据camera索引数组中的反射探针。
+     */
     public getProbeByCamera (camera: Camera) {
         for (let i = 0; i < this._probes.length; i++) {
             if (this._probes[i].camera === camera) {
@@ -169,7 +205,7 @@ export class ReflectionProbeManager {
 
     /**
      * @en Update the cubemap captured by the reflection probe.
-     * @zh 更新反射探针捕获的cubemap
+     * @zh 更新反射探针捕获的cubemap。
      * @param probe update the texture for this probe
      */
     public updateBakedCubemap (probe: ReflectionProbe) {
@@ -187,7 +223,7 @@ export class ReflectionProbeManager {
 
     /**
      * @en Update the plane reflection map for reflection probe render.
-     * @zh 更新反射探针渲染的平面反射贴图
+     * @zh 更新反射探针渲染的平面反射贴图。
      * @param probe update the texture for this probe
      */
     public updatePlanarMap (probe: ReflectionProbe, texture: Texture | null) {
@@ -287,7 +323,7 @@ export class ReflectionProbeManager {
 
     /**
      * @en Update the preview sphere of the Reflection Probe cube mode.
-     * @zh 更新反射探针cube模式的预览球
+     * @zh 更新反射探针cube模式的预览球。
      */
     public updatePreviewSphere (probe: ReflectionProbe) {
         if (!probe || !probe.previewSphere) return;
@@ -299,7 +335,7 @@ export class ReflectionProbeManager {
 
     /**
      * @en Update the preview plane of the Reflection Probe planar mode.
-     * @zh 更新反射探针预览平面
+     * @zh 更新反射探针预览平面。
      */
     public updatePreviewPlane (probe: ReflectionProbe) {
         if (!probe || !probe.previewPlane) return;

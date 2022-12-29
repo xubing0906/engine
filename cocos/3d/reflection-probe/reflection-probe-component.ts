@@ -100,7 +100,7 @@ export class ReflectionProbe extends Component {
 
     /**
      * @en
-     * Gets or sets the size of the box
+     * Gets or sets the size of the box.
      * @zh
      * 获取或设置包围盒的大小。
      */
@@ -165,8 +165,8 @@ export class ReflectionProbe extends Component {
     }
 
     /**
-     * @en set render texture size
-     * @zh 设置渲染纹理大小
+     * @en sets render texture size.
+     * @zh 设置渲染纹理大小。
      */
     @visible(function (this: ReflectionProbe) { return this.probeType === ProbeType.CUBE; })
     @type(Enum(ProbeResolution))
@@ -241,19 +241,27 @@ export class ReflectionProbe extends Component {
         return this._sourceCamera!;
     }
 
+    /**
+     * @en Sets the baked cubemap.
+     * @zh 设置烘焙的cubemap。
+     */
     set cubemap (val: TextureCube | null) {
         this._cubemap = val;
         this.probe.cubemap = val;
         ReflectionProbeManager.probeManager.onUpdateProbes(true);
     }
 
+    /**
+     * @en Reflection probe in the scene.
+     * @zh 场景中的反射探针。
+     */
     get probe () {
         return this._probe!;
     }
 
     /**
-     * @en Reflection probe cube mode preview sphere
-     * @zh 反射探针cube模式的预览小球
+     * @en Reflection probe cube mode preview sphere.
+     * @zh 反射探针cube模式的预览小球。
      */
     set previewSphere (val: Node) {
         this._previewSphere = val;
@@ -270,8 +278,8 @@ export class ReflectionProbe extends Component {
     }
 
     /**
-     * @en Reflection probe planar mode preview plane
-     * @zh 反射探针Planar模式的预览平面
+     * @en Reflection probe planar mode preview plane.
+     * @zh 反射探针Planar模式的预览平面。
      */
     set previewPlane (val: Node) {
         this._previewPlane = val;
@@ -351,7 +359,7 @@ export class ReflectionProbe extends Component {
 
     /**
      * @en Clear the baked cubemap.
-     * @zh 清除烘焙的cubemap
+     * @zh 清除烘焙的cubemap。
      */
     public clearBakedCubemap () {
         this.cubemap = null;
