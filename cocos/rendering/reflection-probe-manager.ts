@@ -391,10 +391,7 @@ export class ReflectionProbeManager {
             const p = this._useCubeModels.get(key);
             if (p !== undefined && p === probe) {
                 this._useCubeModels.delete(key);
-                const meshRender = key.node.getComponent(MeshRenderer);
-                if (meshRender) {
-                    meshRender.updateProbeCubemap(null);
-                }
+                this.updateUseCubeModels(key);
             }
         }
         for (const key of this._usePlanarModels.keys()) {
