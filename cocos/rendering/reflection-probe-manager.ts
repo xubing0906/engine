@@ -53,8 +53,21 @@ export class ReflectionProbeManager {
      */
     private _usePlanarModels = new Map<Model, ReflectionProbe>();
 
+    private _updateForRuntime = true;
+
     constructor () {
         director.on(Director.EVENT_BEFORE_UPDATE, this.onUpdateProbes, this);
+    }
+
+    /**
+     * @en Set and get whether to detect objects leaving or entering the reflection probe's bounding box at runtime.
+     * @zh 设置和获取是否在运行时检测物体离开或者进入反射探针的包围盒。
+     */
+    set updateForRuntime (val: boolean) {
+        this._updateForRuntime = val;
+    }
+    get updateForRuntime () {
+        return this._updateForRuntime;
     }
 
     /**
@@ -62,6 +75,7 @@ export class ReflectionProbeManager {
      * @zh 刷新所有反射探针
      */
     public onUpdateProbes (forceUpdate = false) {
+        if (!this._updateForRuntime) return;
         if (this._probes.length === 0) return;
         const scene = director.getScene();
         if (!scene || !scene.renderScene) {
