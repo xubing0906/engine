@@ -293,6 +293,7 @@ export class ReflectionProbe extends Component {
     onEnable () {
         if (this._probe) {
             ReflectionProbeManager.probeManager.register(this._probe);
+            ReflectionProbeManager.probeManager.onUpdateProbes(true);
             this._probe.enable();
         }
     }
