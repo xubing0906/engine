@@ -312,6 +312,23 @@ export class ReflectionProbeManager {
     }
 
     /**
+     * @en Get the reflection probe used by the model.
+     * @zh 获取模型使用的反射探针。
+     */
+    public getUsedReflectionProbe (model: Model, probeType: ReflectionProbeType) {
+        if (probeType === ReflectionProbeType.BAKED_CUBEMAP) {
+            if (this._useCubeModels.has(model)) {
+                return this._useCubeModels.get(model);
+            }
+        } else if (probeType === ReflectionProbeType.PLANAR_REFLECTION) {
+            if (this._usePlanarModels.has(model)) {
+                return this._usePlanarModels.get(model);
+            }
+        }
+        return null;
+    }
+
+    /**
      * @en
      * select the probe with the nearest distance.
      * @zh
