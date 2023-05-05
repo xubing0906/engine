@@ -12,7 +12,7 @@ export class ColorGradingPass extends SettingPass {
     get setting () { return getSetting(ColorGrading); }
 
     name = 'ColorGradingPass'
-    effectName = 'post-process/color-grading';
+    effectName = 'pipeline/post-process/color-grading';
     outputNames = ['ColorGrading']
 
     checkEnable (camera: Camera) {
@@ -39,7 +39,7 @@ export class ColorGradingPass extends SettingPass {
         const setting = this.setting;
         this.material.setProperty('colorGradingMap', setting.colorGradingMap);
         this.material.setProperty('contribute', setting.contribute);
-        
+
         const input = this.lastPass!.slotName(camera, 0);
         const slot = this.slotName(camera, 0);
         passContext.addRasterPass(outWidth, outHeight, 'color-grading', `color-grading${cameraID}`)
