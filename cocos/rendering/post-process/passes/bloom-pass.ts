@@ -8,19 +8,16 @@ import { passContext } from '../utils/pass-context';
 import { getSetting, SettingPass } from './setting-pass';
 import { Bloom } from '../components';
 
-export const MAX_BLOOM_FILTER_PASS_NUM = 6;
-export const BLOOM_PREFILTERPASS_INDEX = 0;
-export const BLOOM_DOWNSAMPLEPASS_INDEX = 1;
-export const BLOOM_UPSAMPLEPASS_INDEX = BLOOM_DOWNSAMPLEPASS_INDEX + MAX_BLOOM_FILTER_PASS_NUM;
-export const BLOOM_COMBINEPASS_INDEX = BLOOM_UPSAMPLEPASS_INDEX + MAX_BLOOM_FILTER_PASS_NUM;
-const outputNames = ['BloomScreenColor0', 'BloomScreenColor1'];
+const MAX_BLOOM_FILTER_PASS_NUM = 6;
+const BLOOM_DOWNSAMPLEPASS_INDEX = 1;
+const BLOOM_UPSAMPLEPASS_INDEX = BLOOM_DOWNSAMPLEPASS_INDEX + MAX_BLOOM_FILTER_PASS_NUM;
+const BLOOM_COMBINEPASS_INDEX = BLOOM_UPSAMPLEPASS_INDEX + MAX_BLOOM_FILTER_PASS_NUM;
 export class BloomPass extends SettingPass {
     get setting () { return getSetting(Bloom); }
 
     name = 'BloomPass'
     effectName = 'pipeline/post-process/bloom';
-    outputName = outputNames[0]
-    //outputNames = ['BloomColor']
+    outputNames = ['BloomColor']
 
     checkEnable (camera: Camera) {
         const enable = super.checkEnable(camera);
@@ -28,12 +25,9 @@ export class BloomPass extends SettingPass {
         return enable && !!setting && setting.enabledInHierarchy;
     }
 
-    slotName (camera: Camera, index = 0) {
-        return this.outputName;
-    }
-
     public render (camera: Camera, ppl: Pipeline): void {
         const cameraID = getCameraUniqueID(camera);
+        const cameraName = `Camera${cameraID}`;
         const area = this.getRenderArea(camera);
         const inputWidth = area.width;
         const inputHeight = area.height;
@@ -65,14 +59,10 @@ export class BloomPass extends SettingPass {
             .version();
 
         //=== Bloom downSampler ===
-        let slotIdx = 0;
-        const cameraName = `Camera${cameraID}`;
         for (let i = 0; i < setting.iterations; ++i) {
             const texSize = new Vec4(outWidth, outHeight, 0, 0);
             outWidth >>= 1;
             outHeight >>= 1;
-            const slotName = outputNames[slotIdx];
-            slotIdx = (++slotIdx) % 2;
             const bloomPassDownSampleRTName = `dsBloomPassDownSampleColor${cameraName}${i}`;
             const downSamplerInput = i === 0 ? output : `dsBloomPassDownSampleColor${cameraName}${i - 1}`;
             passContext.material.setProperty('texSize', texSize, BLOOM_DOWNSAMPLEPASS_INDEX + i);
@@ -83,13 +73,12 @@ export class BloomPass extends SettingPass {
                 .blitScreen(BLOOM_DOWNSAMPLEPASS_INDEX + i)
                 .version();
         }
+
         // === Bloom upSampler ===
         for (let i = 0; i < setting.iterations; ++i) {
             const texSize = new Vec4(outWidth, outHeight, 0, 0);
             outWidth <<= 1;
             outHeight <<= 1;
-            const slotName = outputNames[slotIdx];
-            slotIdx = (++slotIdx) % 2;
             const bloomPassUpSampleRTName = `dsBloomPassUpSampleColor${cameraName}${setting.iterations - 1 - i}`;
             // eslint-disable-next-line max-len
             const upSamplerInput = i === 0 ? `dsBloomPassDownSampleColor${cameraName}${setting.iterations - 1}` : `dsBloomPassUpSampleColor${cameraName}${setting.iterations - i}`;
@@ -110,7 +99,7 @@ export class BloomPass extends SettingPass {
             .setViewport(area.x, area.y, outWidth, outHeight)
             .setPassInput(input, 'outputResultMap')
             .setPassInput(`dsBloomPassUpSampleColor${cameraName}${0}`, 'bloomTexture')
-            .addRasterView(this.outputName, Format.RGBA8)
+            .addRasterView(this.slotName(camera, 0), Format.RGBA8)
             .blitScreen(BLOOM_COMBINEPASS_INDEX)
             .version();
     }
