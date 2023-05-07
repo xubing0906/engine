@@ -260,7 +260,7 @@ class BloomData {
         if (this.bloomMaterial) return;
         this.bloomMaterial = new Material();
         this.bloomMaterial._uuid = 'builtin-bloom-material';
-        this.bloomMaterial.initialize({ effectName: 'pipeline/bloom' });
+        this.bloomMaterial.initialize({ effectName: 'pipeline/post-process/bloom' });
         for (let i = 0; i < this.bloomMaterial.passes.length; ++i) {
             this.bloomMaterial.passes[i].tryCompile();
         }
