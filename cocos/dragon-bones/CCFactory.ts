@@ -22,9 +22,9 @@
  THE SOFTWARE.
 */
 
-import { EDITOR_NOT_IN_PREVIEW } from 'internal:constants';
+import { EDITOR } from 'internal:constants';
 import { Armature, BaseObject, Animation, BaseFactory, DragonBones } from '@cocos/dragonbones-js';
-import { ISchedulable, Scheduler, System, _decorator } from '../core';
+import { ISchedulable, Scheduler, System, cclegacy, _decorator } from '../core';
 import { CCTextureAtlasData } from './CCTextureData';
 import { TextureBase } from '../asset/assets/texture-base';
 import { CCSlot } from './CCSlot';
@@ -117,7 +117,7 @@ export class CCFactory extends BaseFactory implements ISchedulable {
      * @zh 触发 ArmatureDisplay 组件更新动画和渲染数据。
      */
     update (dt: number) {
-        if (EDITOR_NOT_IN_PREVIEW) return;
+        if (EDITOR && !cclegacy.GAME_VIEW) return;
         this._dragonBones.advanceTime(dt);
     }
     /**

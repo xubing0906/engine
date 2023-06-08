@@ -23,7 +23,7 @@
 */
 
 import { ccclass, displayOrder, executeInEditMode, help, menu, slide, range, requireComponent, tooltip, type, serializable } from 'cc.decorator';
-import { EDITOR_NOT_IN_PREVIEW } from 'internal:constants';
+import { EDITOR } from 'internal:constants';
 import { warn } from '../core/platform';
 import { Component, EventHandler as ComponentEventHandler } from '../scene-graph';
 import { UITransform } from '../2d/framework';
@@ -242,7 +242,7 @@ export class VideoPlayer extends Component {
      */
     @tooltip('i18n:videoplayer.fullScreenOnAwake')
     get fullScreenOnAwake () {
-        if (!EDITOR_NOT_IN_PREVIEW) {
+        if (!EDITOR || legacyCC.GAME_VIEW) {
             if (this._impl) {
                 this._fullScreenOnAwake = this._impl.fullScreenOnAwake;
                 return this._fullScreenOnAwake;
@@ -377,7 +377,7 @@ export class VideoPlayer extends Component {
     }
 
     public __preload () {
-        if (EDITOR_NOT_IN_PREVIEW) {
+        if (EDITOR && !legacyCC.GAME_VIEW) {
             return;
         }
         this._impl = VideoPlayerImplManager.getImpl(this);

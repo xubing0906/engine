@@ -23,7 +23,7 @@
 */
 
 import { ccclass, help, executeInEditMode, menu, tooltip, type, displayOrder, serializable, requireComponent } from 'cc.decorator';
-import { EDITOR_NOT_IN_PREVIEW } from 'internal:constants';
+import { EDITOR } from 'internal:constants';
 import { UITransform } from '../2d/framework';
 import { Component, EventHandler as ComponentEventHandler } from '../scene-graph';
 import { WebViewImplManager } from './web-view-impl-manager';
@@ -162,7 +162,7 @@ export class WebView extends Component {
     }
 
     public __preload () {
-        if (EDITOR_NOT_IN_PREVIEW) {
+        if (EDITOR && !legacyCC.GAME_VIEW) {
             return;
         }
         this._impl = WebViewImplManager.getImpl(this);
