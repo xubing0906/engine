@@ -32,6 +32,7 @@ import { DescriptorSet, DescriptorSetInfo, Device, InputAssembler, Texture, Text
 import { errorID, Mat4, cclegacy } from '../../core';
 import { getPhaseID } from '../../rendering/pass-phase';
 import { Root } from '../../root';
+import { MacroRecord } from '../core/pass-utils';
 
 const _dsInfo = new DescriptorSetInfo(null!);
 const MAX_PASS_COUNT = 8;
@@ -64,6 +65,7 @@ export class SubModel {
     protected _instancedWorldMatrixIndex = -1;
     protected _instancedSHIndex = -1;
     protected _useReflectionProbeType = 0;
+    protected _globalPatches: MacroRecord = {};
 
     /**
      * @en
@@ -233,6 +235,8 @@ export class SubModel {
         this._patches = patches ? patches.sort() : null;
         this._passes = passes;
 
+        this._globalPatches = { ...pipeline.macros };
+
         this._flushPassInfo();
 
         this.priority = RenderPriority.DEFAULT;
@@ -348,7 +352,7 @@ export class SubModel {
             patches = patches.sort();
             if (this._patches && patches.length === this._patches.length) {
                 const patchesStateUnchanged = JSON.stringify(patches) === JSON.stringify(this._patches);
-                if (patchesStateUnchanged) return;
+                if (patchesStateUnchanged && !this._isNeedUpdateGlobalMacro()) return;
             }
         }
         this._patches = patches;
@@ -364,6 +368,16 @@ export class SubModel {
         }
 
         this._flushPassInfo();
+    }
+
+    private _isNeedUpdateGlobalMacro (): boolean {
+        const globalMacros = cclegacy.director.root.pipeline.macros;
+        const bEqual = Object.keys(globalMacros).every((key) => key in this._globalPatches && globalMacros[key] === this._globalPatches[key]);
+        if (!bEqual) {
+            this._globalPatches = { ...globalMacros };
+            return true;
+        }
+        return false;
     }
 
     /**
