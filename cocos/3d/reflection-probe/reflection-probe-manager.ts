@@ -442,6 +442,22 @@ export class ReflectionProbeManager {
     }
 
     /**
+     * @en Set reflection probe used by the model.
+     * @zh 手动设置模型使用的反射探针。
+     * @param model set the probe for this model
+     * @param probe reflection probe to be set
+     * @param blendProbe reflection probe for blend
+     */
+    public setReflectionProbe (model: Model, probe: ReflectionProbe, blendProbe: ReflectionProbe | null = null) {
+        if (!probe) return;
+        this._useCubeModels.set(model, probe);
+        this._updateCubemapOfModel(model, probe);
+        if (blendProbe) {
+            this._updateBlendProbeInfo(model, probe, blendProbe);
+        }
+    }
+
+    /**
      * @en
      * select the probe with the nearest distance.
      * @zh
@@ -535,7 +551,8 @@ export class ReflectionProbeManager {
         if (probe) {
             meshRender.updateReflectionProbeDataMap(this._dataTexture);
             if (this._isUsedBlending(model)) {
-                this._updateBlendProbeInfo(model, probe);
+                const blendProbe = this._getBlendProbe(model);
+                this._updateBlendProbeInfo(model, probe, blendProbe);
             }
         }
     }
@@ -559,7 +576,7 @@ export class ReflectionProbeManager {
         return false;
     }
 
-    private _updateBlendProbeInfo (model: Model, probe: ReflectionProbe) {
+    private _updateBlendProbeInfo (model: Model, probe: ReflectionProbe, blendProbe: ReflectionProbe | null) {
         const node = model.node;
         if (!node) {
             return;
@@ -568,7 +585,6 @@ export class ReflectionProbeManager {
         if (!meshRender) {
             return;
         }
-        const blendProbe = this._getBlendProbe(model);
         if (blendProbe) {
             meshRender.updateReflectionProbeBlendId(blendProbe.getProbeId());
             meshRender.updateProbeBlendCubemap(blendProbe.cubemap);
