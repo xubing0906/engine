@@ -7,8 +7,10 @@ CCEffect %{
     - vert: sky-vs
       frag: sky-fs
       properties: &props
-        environmentMap:     { value: grey }
-        positionScaling:    { value: 1.0, target: params.w, editor: { tooltip: 'Set a smaller value (such as less than 1.0) to remove the effects of fog' } }
+        environmentMap:      { value: grey }
+        positionScaling:     { value: 1.0, target: params.w, editor: { tooltip: 'Set a smaller value (such as less than 1.0) to remove the effects of fog' } }
+        blendEnvironmentMap: { value: grey, editor: { parent: BLEND_ENV_MAP } }
+        blendWeight:         { value: 0.0, target: params.x, editor: { parent: BLEND_ENV_MAP } }
       priority : max - 10
       rasterizerState : &r1
         cullMode : none
@@ -28,7 +30,6 @@ CCEffect %{
 CCProgram shared-ubos %{
   uniform Constants {
     vec4 params;
-    float blendWeight;
   };
 }%
 
@@ -65,7 +66,7 @@ CCProgram surface-fragment %{
       vec3 rotationDir = RotationVecFromAxisY(normal.xyz, cc_surfaceTransform.z, cc_surfaceTransform.w);
       c = sampleEnvMap(environmentMap, rotationDir);
       #if BLEND_ENV_MAP
-        c = mix(c, sampleEnvMap(blendEnvironmentMap, rotationDir), blendWeight);
+        c = mix(c, sampleEnvMap(blendEnvironmentMap, rotationDir), params.x);
       #endif
     #endif
     return vec4(c * cc_ambientSky.w, 1.0);
