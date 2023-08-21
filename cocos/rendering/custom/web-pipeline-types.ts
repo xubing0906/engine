@@ -90,6 +90,7 @@ export class ProbeHelperQueue {
             }
             subModel.onMacroPatchesStateChanged(patches);
         }
+        this.probeMap = [];
     }
     applyMacro (model: Model, probeLayoutId: number): void {
         const subModels = model.subModels;
@@ -110,7 +111,7 @@ export class ProbeHelperQueue {
                 bUseReflectPass = false;
             }
             if (passIdx < 0) { continue; }
-            if (!bUseReflectPass) {
+            if (!bUseReflectPass && subModel.patches!.find((value) => value.name === CC_USE_RGBE_OUTPUT) === undefined) {
                 let patches: IMacroPatch[] = [];
                 patches = patches.concat(subModel.patches!);
                 const useRGBEPatchs: IMacroPatch[] = [
