@@ -24,7 +24,7 @@
 
 import { SubModel } from '../render-scene/scene/submodel';
 import { isEnableEffect, SetIndex } from './define';
-import { Device, RenderPass, Shader, CommandBuffer } from '../gfx';
+import { Device, RenderPass, Shader, CommandBuffer, Texture, SamplerInfo, Address, PipelineState, Attribute, Format, InputAssemblerInfo, BufferInfo, BufferUsageBit, MemoryUsageBit, InputAssembler, Rect, SurfaceTransform } from '../gfx';
 import { getPhaseID } from './pass-phase';
 import { PipelineStateManager } from './pipeline-state-manager';
 import { Pass, BatchingSchemes, IMacroPatch } from '../render-scene/core/pass';
@@ -34,10 +34,13 @@ import { Camera, SKYBOX_FLAG } from '../render-scene/scene/camera';
 import { PipelineRuntime } from './custom/pipeline';
 import { RenderInstancedQueue } from './render-instanced-queue';
 import { cclegacy, geometry } from '../core';
+import { Material } from '../asset/assets/material';
+import { PipelineInputAssemblerData } from './render-pipeline';
 
 const CC_USE_RGBE_OUTPUT = 'CC_USE_RGBE_OUTPUT';
 let _phaseID = getPhaseID('default');
 let _phaseReflectMapID = getPhaseID('reflect-map');
+let _phaseConvertRgbeID = getPhaseID('convert-rgbe');
 function getPassIndex (subModel: SubModel): number {
     const passes = subModel.passes;
     const r = cclegacy.rendering;
@@ -63,6 +66,18 @@ function getReflectMapPassIndex (subModel: SubModel): number {
     return -1;
 }
 
+function getRGBEPassIndex (subModel: SubModel): number {
+    const passes = subModel.passes;
+    const r = cclegacy.rendering;
+    if (isEnableEffect()) _phaseConvertRgbeID = r.getPhaseID(r.getPassID('default'), 'convert-rgbe');
+    for (let k = 0; k < passes.length; k++) {
+        if (((!r || !r.enableEffectImport) && passes[k].phase === _phaseConvertRgbeID)
+        || (isEnableEffect() && passes[k].phaseID === _phaseConvertRgbeID)) {
+            return k;
+        }
+    }
+    return -1;
+}
 /**
  * @zh
  * 反射探针渲染队列
@@ -75,6 +90,8 @@ export class RenderReflectionProbeQueue {
     private _rgbeSubModelsArray: SubModel[] = [];
     private _instancedQueue: RenderInstancedQueue;
     private _patches: IMacroPatch[] = [];
+
+    private _bgMat: Material|null = null;
 
     public constructor (pipeline: PipelineRuntime) {
         this._pipeline = pipeline;
@@ -130,7 +147,7 @@ export class RenderReflectionProbeQueue {
             //Filter transparent objects
             const isTransparent = subModel.passes[0].blendState.targets[0].blend;
             if (isTransparent) {
-                continue;
+                //continue;
             }
 
             let passIdx = getReflectMapPassIndex(subModel);
@@ -144,16 +161,16 @@ export class RenderReflectionProbeQueue {
             const pass = subModel.passes[passIdx];
             const batchingScheme = pass.batchingScheme;
 
-            if (!bUseReflectPass) {
-                this._patches = [];
-                this._patches = this._patches.concat(subModel.patches!);
-                const useRGBEPatchs: IMacroPatch[] = [
-                    { name: CC_USE_RGBE_OUTPUT, value: true },
-                ];
-                this._patches = this._patches.concat(useRGBEPatchs);
-                subModel.onMacroPatchesStateChanged(this._patches);
-                this._rgbeSubModelsArray.push(subModel);
-            }
+            // if (!bUseReflectPass) {
+            //     this._patches = [];
+            //     this._patches = this._patches.concat(subModel.patches!);
+            //     const useRGBEPatchs: IMacroPatch[] = [
+            //         { name: CC_USE_RGBE_OUTPUT, value: true },
+            //     ];
+            //     this._patches = this._patches.concat(useRGBEPatchs);
+            //     subModel.onMacroPatchesStateChanged(this._patches);
+            //     this._rgbeSubModelsArray.push(subModel);
+            // }
 
             if (batchingScheme === BatchingSchemes.INSTANCING) {            // instancing
                 const buffer = pass.getInstancedBuffer();
@@ -173,7 +190,7 @@ export class RenderReflectionProbeQueue {
      * record CommandBuffer
      */
     public recordCommandBuffer (device: Device, renderPass: RenderPass, cmdBuff: CommandBuffer): void {
-        this._instancedQueue.recordCommandBuffer(device, renderPass, cmdBuff);
+        //this._instancedQueue.recordCommandBuffer(device, renderPass, cmdBuff);
 
         for (let i = 0; i < this._subModelsArray.length; ++i) {
             const subModel = this._subModelsArray[i];
@@ -189,8 +206,216 @@ export class RenderReflectionProbeQueue {
             cmdBuff.bindInputAssembler(ia);
             cmdBuff.draw(ia);
         }
-        this.resetRGBEMacro();
-        this._instancedQueue.clear();
+        //this.resetRGBEMacro();
+        //this._instancedQueue.clear();
+    }
+    // eslint-disable-next-line max-len
+    public recordCommandBufferRGBE (device: Device, renderPass: RenderPass, cmdBuff: CommandBuffer, rgbeTex: Texture| null): void {
+        //this._instancedQueue.recordCommandBuffer(device, renderPass, cmdBuff);
+        if (!this._bgMat) {
+            this._bgMat = new Material();
+            this._bgMat.initialize({ effectName: 'util/splash-screen' });
+        }
+        // const subModel = this._subModelsArray[i];
+        // const passIdx = getRGBEPassIndex(subModel);
+        // if (passIdx < 0) {
+        //     continue;
+        // }
+
+        for (let i = 0; i < this._subModelsArray.length; ++i) {
+            const subModel = this._subModelsArray[i];
+            const rgbePassIdx = getRGBEPassIndex(subModel);
+            if (rgbePassIdx < 0) {
+                continue;
+            }
+            const shader = subModel.shaders[rgbePassIdx];
+            const pass = subModel.passes[rgbePassIdx];
+
+            // const pass = this._bgMat.passes[0];
+            // const shader = pass.getShaderVariant();
+
+            const handle = pass.getBinding('rgbeTex');
+            pass.bindTexture(handle, rgbeTex!);
+            const samplerInfo = new SamplerInfo();
+            samplerInfo.addressU = Address.CLAMP;
+            samplerInfo.addressV = Address.CLAMP;
+            samplerInfo.addressW = Address.CLAMP;
+            pass.bindSampler(handle, device.getSampler(samplerInfo));
+
+            const ia1 = this._createQuadInputAssembler();
+            const vb = this._genQuadVertexData(device, SurfaceTransform.IDENTITY, new Rect(0, 0, 256, 256));
+            ia1.quadVB?.update(vb);
+            //const ia = subModel.inputAssembler;
+            const pso = PipelineStateManager.getOrCreatePipelineState(device, pass, shader, renderPass, ia1.quadIA!);
+            const descriptorSet = pass.descriptorSet;
+
+            cmdBuff.bindPipelineState(pso);
+            cmdBuff.bindDescriptorSet(SetIndex.MATERIAL, descriptorSet);
+            cmdBuff.bindDescriptorSet(SetIndex.LOCAL, subModel.descriptorSet);
+            cmdBuff.bindInputAssembler(ia1.quadIA!);
+            cmdBuff.draw(ia1.quadIA!);
+            break;
+        }
+
+        // const pass = this._bgMat.passes[0];
+        // const shader = pass.getShaderVariant();
+
+        // const handle = pass.getBinding('rgbeTex');
+        // pass.bindTexture(handle, rgbeTex!);
+        // const samplerInfo = new SamplerInfo();
+        // samplerInfo.addressU = Address.CLAMP;
+        // samplerInfo.addressV = Address.CLAMP;
+        // samplerInfo.addressW = Address.CLAMP;
+        // pass.bindSampler(handle, device.getSampler(samplerInfo));
+
+        // const inputAssembler = this._createQuadInputAssembler();
+        // const pso = PipelineStateManager.getOrCreatePipelineState(device, pass, shader!, renderPass, inputAssembler);
+
+        // if (pso != null) {
+        //     cmdBuff.bindPipelineState(pso);
+        //     cmdBuff.bindDescriptorSet(SetIndex.MATERIAL, pass.descriptorSet);
+        //     //cmdBuff.bindDescriptorSet(SetIndex.LOCAL, pass.descriptorSet);
+        //     cmdBuff.bindInputAssembler(inputAssembler);
+        //     cmdBuff.draw(inputAssembler);
+        // }
+        //this.resetRGBEMacro();
+        //this._instancedQueue.clear();
+    }
+
+    private _genQuadVertexData (device: Device, surfaceTransform: SurfaceTransform, renderArea: Rect): Float32Array {
+        const vbData = new Float32Array(4 * 4);
+        const minX = renderArea.x / 256;
+        const maxX = (renderArea.x + renderArea.width) / 256;
+        let minY = renderArea.y / 256;
+        let maxY = (renderArea.y + renderArea.height) / 256;
+        if (device.capabilities.screenSpaceSignY > 0) {
+            const temp = maxY;
+            maxY       = minY;
+            minY       = temp;
+        }
+        let n = 0;
+        switch (surfaceTransform) {
+        case (SurfaceTransform.IDENTITY):
+            n = 0;
+            vbData[n++] = -1.0; vbData[n++] = -1.0; vbData[n++] = minX; vbData[n++] = maxY;
+            vbData[n++] = 1.0; vbData[n++] = -1.0; vbData[n++] = maxX; vbData[n++] = maxY;
+            vbData[n++] = -1.0; vbData[n++] = 1.0; vbData[n++] = minX; vbData[n++] = minY;
+            vbData[n++] = 1.0; vbData[n++] = 1.0; vbData[n++] = maxX; vbData[n++] = minY;
+            break;
+        case (SurfaceTransform.ROTATE_90):
+            n = 0;
+            vbData[n++] = -1.0; vbData[n++] = -1.0; vbData[n++] = maxX; vbData[n++] = maxY;
+            vbData[n++] = 1.0; vbData[n++] = -1.0; vbData[n++] = maxX; vbData[n++] = minY;
+            vbData[n++] = -1.0; vbData[n++] = 1.0; vbData[n++] = minX; vbData[n++] = maxY;
+            vbData[n++] = 1.0; vbData[n++] = 1.0; vbData[n++] = minX; vbData[n++] = minY;
+            break;
+        case (SurfaceTransform.ROTATE_180):
+            n = 0;
+            vbData[n++] = -1.0; vbData[n++] = -1.0; vbData[n++] = minX; vbData[n++] = minY;
+            vbData[n++] = 1.0; vbData[n++] = -1.0; vbData[n++] = maxX; vbData[n++] = minY;
+            vbData[n++] = -1.0; vbData[n++] = 1.0; vbData[n++] = minX; vbData[n++] = maxY;
+            vbData[n++] = 1.0; vbData[n++] = 1.0; vbData[n++] = maxX; vbData[n++] = maxY;
+            break;
+        case (SurfaceTransform.ROTATE_270):
+            n = 0;
+            vbData[n++] = -1.0; vbData[n++] = -1.0; vbData[n++] = minX; vbData[n++] = minY;
+            vbData[n++] = 1.0; vbData[n++] = -1.0; vbData[n++] = minX; vbData[n++] = maxY;
+            vbData[n++] = -1.0; vbData[n++] = 1.0; vbData[n++] = maxX; vbData[n++] = minY;
+            vbData[n++] = 1.0; vbData[n++] = 1.0; vbData[n++] = maxX; vbData[n++] = maxY;
+            break;
+        default:
+            break;
+        }
+
+        return vbData;
+    }
+
+    protected _createQuadInputAssembler (): PipelineInputAssemblerData {
+        // create vertex buffer
+        const inputAssemblerData = new PipelineInputAssemblerData();
+
+        const vbStride = Float32Array.BYTES_PER_ELEMENT * 4;
+        const vbSize = vbStride * 4;
+        const device = cclegacy.director.root.device;
+        const quadVB = device.createBuffer(new BufferInfo(
+            BufferUsageBit.VERTEX | BufferUsageBit.TRANSFER_DST,
+            MemoryUsageBit.DEVICE | MemoryUsageBit.HOST,
+            vbSize,
+            vbStride,
+        ));
+
+        if (!quadVB) {
+            return inputAssemblerData;
+        }
+
+        // create index buffer
+        const ibStride = Uint8Array.BYTES_PER_ELEMENT;
+        const ibSize = ibStride * 6;
+
+        const quadIB = device.createBuffer(new BufferInfo(
+            BufferUsageBit.INDEX | BufferUsageBit.TRANSFER_DST,
+            MemoryUsageBit.DEVICE,
+            ibSize,
+            ibStride,
+        ));
+
+        if (!quadIB) {
+            return inputAssemblerData;
+        }
+
+        const indices = new Uint8Array(6);
+        indices[0] = 0; indices[1] = 1; indices[2] = 2;
+        indices[3] = 1; indices[4] = 3; indices[5] = 2;
+
+        quadIB.update(indices);
+
+        // create input assembler
+
+        const attributes = new Array<Attribute>(2);
+        attributes[0] = new Attribute('a_position', Format.RG32F);
+        attributes[1] = new Attribute('a_texCoord', Format.RG32F);
+
+        const quadIA = device.createInputAssembler(new InputAssemblerInfo(
+            attributes,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+            [quadVB],
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+            quadIB,
+        ));
+
+        inputAssemblerData.quadIB = quadIB;
+        inputAssemblerData.quadVB = quadVB;
+        inputAssemblerData.quadIA = quadIA;
+        return inputAssemblerData;
+        // const verts = new Float32Array([-0.5, -0.5, 0.0, 0.5, -0.5, 0.0, 0.0,  0.5, 0.0]);
+        // const vbStride = Float32Array.BYTES_PER_ELEMENT * 4;
+        // const vbSize = vbStride * 4;
+        // const vertexBuffers = this._pipeline.device.createBuffer(new BufferInfo(
+        //     BufferUsageBit.VERTEX | BufferUsageBit.TRANSFER_DST,
+        //     MemoryUsageBit.DEVICE,
+        //     vbSize,
+        //     vbStride,
+        // ));
+        // vertexBuffers.update(verts);
+
+        // // create index buffer
+        // const indices = new Uint16Array([0, 1, 2]);
+        // const ibStride = Uint16Array.BYTES_PER_ELEMENT;
+        // const ibSize = ibStride * 3;
+        // const indicesBuffers = this._pipeline.device.createBuffer(new BufferInfo(
+        //     BufferUsageBit.INDEX | BufferUsageBit.TRANSFER_DST,
+        //     MemoryUsageBit.DEVICE,
+        //     ibSize,
+        //     ibStride,
+        // ));
+        // indicesBuffers.update(indices);
+
+        // const attributes: Attribute[] = [
+        //     new Attribute('a_position', Format.RG32F),
+        //     new Attribute('a_texCoord', Format.RG32F),
+        // ];
+        // const IAInfo = new InputAssemblerInfo(attributes, [vertexBuffers], indicesBuffers);
+        // return this._pipeline.device.createInputAssembler(IAInfo);
     }
     public resetRGBEMacro (): void {
         for (let i = 0; i < this._rgbeSubModelsArray.length; i++) {

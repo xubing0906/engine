@@ -23,7 +23,7 @@
 */
 
 import { ccclass } from 'cc.decorator';
-import { Color, Rect, Framebuffer, ClearFlagBit } from '../../gfx';
+import { Color, Rect, Framebuffer, ClearFlagBit, Texture, TextureBlit, Filter, TextureInfo, TextureType, TextureUsageBit, Format } from '../../gfx';
 import { IRenderStageInfo, RenderStage } from '../render-stage';
 import { ForwardStagePriority } from '../enum';
 import { ForwardPipeline } from '../forward/forward-pipeline';
@@ -33,6 +33,9 @@ import { Camera, ReflectionProbe } from '../../render-scene/scene';
 import { RenderReflectionProbeQueue } from '../render-reflection-probe-queue';
 import { Vec3 } from '../../core';
 import { packRGBE } from '../../core/math/color';
+import { ImageAsset, Texture2D } from '../../asset/assets';
+import { PixelFormat } from '../../asset/assets/asset-enum';
+import { gfx } from '../../../typedoc-index';
 
 const colors: Color[] = [new Color(1, 1, 1, 1)];
 
@@ -137,8 +140,74 @@ export class ReflectionProbeStage extends RenderStage {
 
         this._probeRenderQueue.recordCommandBuffer(device, renderPass, cmdBuff);
         cmdBuff.endRenderPass();
-
         pipeline.pipelineUBO.updateCameraUBO(camera);
+
+        const srcTex = this._frameBuffer!.colorTextures[0];
+        const textureRegion = new TextureBlit();
+        textureRegion.srcExtent.width = srcTex!.width;
+        textureRegion.srcExtent.height = srcTex!.height;
+        textureRegion.dstExtent.width = srcTex!.width;
+        textureRegion.dstExtent.height = srcTex!.height;
+
+        const rebeTexture = device.createTexture(new TextureInfo(
+            TextureType.TEX2D,
+            TextureUsageBit.SAMPLED | TextureUsageBit.TRANSFER_DST,
+            Format.RGBA8,
+            srcTex!.width,
+            srcTex!.height,
+        ));
+
+        device.commandBuffer.blitTexture(srcTex!, rebeTexture, [textureRegion], Filter.LINEAR);
+
+        const pipelineSceneData = pipeline.pipelineSceneData;
+        const shadingScale = pipelineSceneData.shadingScale;
+
+        const vp = camera.viewport;
+        this._renderArea.x = vp.x;
+        this._renderArea.y = vp.y;
+        this._renderArea.width =  vp.width * shadingScale;
+        this._renderArea.height = vp.height * shadingScale;
+
+        cmdBuff.beginRenderPass(
+            renderPass,
+            this._frameBuffer!,
+            this._renderArea,
+            colors,
+            camera.clearDepth,
+            camera.clearStencil,
+        );
+        cmdBuff.bindDescriptorSet(SetIndex.GLOBAL, pipeline.descriptorSet);
+
+        this._probeRenderQueue.recordCommandBufferRGBE(device, renderPass, cmdBuff, rebeTexture);
+        cmdBuff.endRenderPass();
+    }
+
+    public readPixels (gfxTexture: Texture): Uint8Array | null {
+        const width = gfxTexture.width;
+        const height = gfxTexture.height;
+
+        const needSize = 4 * width * height;
+        const buffer = new Uint8Array(needSize);
+
+        if (!gfxTexture) {
+            return null;
+        }
+
+        const gfxDevice = gfx.deviceManager.gfxDevice;
+
+        const bufferViews: ArrayBufferView[] = [];
+        const regions: gfx.BufferTextureCopy[] = [];
+
+        const region0 = new gfx.BufferTextureCopy();
+        region0.texOffset.x = 0;
+        region0.texOffset.y = 0;
+        region0.texExtent.width = gfxTexture.width;
+        region0.texExtent.height = gfxTexture.height;
+        regions.push(region0);
+
+        bufferViews.push(buffer);
+        gfxDevice?.copyTextureToBuffers(gfxTexture, bufferViews, regions);
+        return buffer;
     }
 
     public activate (pipeline: ForwardPipeline, flow: ReflectionProbeFlow): void {

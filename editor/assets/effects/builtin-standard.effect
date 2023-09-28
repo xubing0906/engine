@@ -64,6 +64,11 @@ CCEffect %{
       frag: reflect-map-fs
       phase: reflect-map
       propertyIndex: 0
+    - &convert-rgbe
+      vert: standard-vs
+      frag: convert-rgbe-fs
+      phase: convert-rgbe
+      propertyIndex: 0
     - &planar-shadow
       vert: planar-shadow-vs
       frag: planar-shadow-fs
@@ -468,5 +473,18 @@ CCProgram reflect-map-fs %{
   #include <lighting-models/includes/standard>
   #include <surfaces/includes/standard-fs>
   #include <shading-entries/main-functions/render-to-reflectmap/fs>
+}%
+
+CCProgram convert-rgbe-fs %{
+  precision highp float;
+  uniform sampler2D rgbeTex;
+  #include <macro-remapping>
+  #include <surfaces/effect-macros/common-macros>
+  #include <surfaces/includes/common-fs>
+  #include <shared-ubos>
+  #include <surface-fragment>
+  #include <lighting-models/includes/standard>
+  #include <surfaces/includes/standard-fs>
+  #include <shading-entries/main-functions/render-to-reflectmap/convert-fs>
 }%
 
