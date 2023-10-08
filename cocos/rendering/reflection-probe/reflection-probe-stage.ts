@@ -29,7 +29,7 @@ import { ForwardStagePriority } from '../enum';
 import { ForwardPipeline } from '../forward/forward-pipeline';
 import { SetIndex } from '../define';
 import { ReflectionProbeFlow } from './reflection-probe-flow';
-import { Camera, ReflectionProbe } from '../../render-scene/scene';
+import { Camera, CameraProjection, CameraUsage, ReflectionProbe } from '../../render-scene/scene';
 import { RenderReflectionProbeQueue } from '../render-reflection-probe-queue';
 import { Vec3 } from '../../core';
 import { packRGBE } from '../../core/math/color';
@@ -140,33 +140,27 @@ export class ReflectionProbeStage extends RenderStage {
 
         this._probeRenderQueue.recordCommandBuffer(device, renderPass, cmdBuff);
         cmdBuff.endRenderPass();
-        pipeline.pipelineUBO.updateCameraUBO(camera);
 
-        const srcTex = this._frameBuffer!.colorTextures[0];
-        const textureRegion = new TextureBlit();
-        textureRegion.srcExtent.width = srcTex!.width;
-        textureRegion.srcExtent.height = srcTex!.height;
-        textureRegion.dstExtent.width = srcTex!.width;
-        textureRegion.dstExtent.height = srcTex!.height;
+        // const srcTex = this._frameBuffer!.colorTextures[0];
+        // const textureRegion = new TextureBlit();
+        // textureRegion.srcExtent.width = srcTex!.width;
+        // textureRegion.srcExtent.height = srcTex!.height;
+        // textureRegion.dstExtent.width = srcTex!.width;
+        // textureRegion.dstExtent.height = srcTex!.height;
 
-        const rebeTexture = device.createTexture(new TextureInfo(
-            TextureType.TEX2D,
-            TextureUsageBit.SAMPLED | TextureUsageBit.TRANSFER_DST,
-            Format.RGBA8,
-            srcTex!.width,
-            srcTex!.height,
-        ));
+        // const rgbeTexture = device.createTexture(new TextureInfo(
+        //     TextureType.TEX2D,
+        //     TextureUsageBit.SAMPLED | TextureUsageBit.TRANSFER_DST,
+        //     Format.RGBA8,
+        //     srcTex!.width,
+        //     srcTex!.height,
+        // ));
 
-        device.commandBuffer.blitTexture(srcTex!, rebeTexture, [textureRegion], Filter.LINEAR);
+        // device.commandBuffer.blitTexture(srcTex!, rgbeTexture, [textureRegion], Filter.LINEAR);
 
-        const pipelineSceneData = pipeline.pipelineSceneData;
-        const shadingScale = pipelineSceneData.shadingScale;
-
-        const vp = camera.viewport;
-        this._renderArea.x = vp.x;
-        this._renderArea.y = vp.y;
-        this._renderArea.width =  vp.width * shadingScale;
-        this._renderArea.height = vp.height * shadingScale;
+        this._probe?.setProjectionType(CameraProjection.ORTHO);
+        this._probe!.resetCameraTransform();
+        pipeline.pipelineUBO.updateCameraUBO(this._probe!.camera);
 
         cmdBuff.beginRenderPass(
             renderPass,
@@ -178,8 +172,11 @@ export class ReflectionProbeStage extends RenderStage {
         );
         cmdBuff.bindDescriptorSet(SetIndex.GLOBAL, pipeline.descriptorSet);
 
-        this._probeRenderQueue.recordCommandBufferRGBE(device, renderPass, cmdBuff, rebeTexture);
+        this._probeRenderQueue.recordCommandBufferRGBE(this._probe!.camera, device, renderPass, cmdBuff, null);
         cmdBuff.endRenderPass();
+
+        pipeline.pipelineUBO.updateCameraUBO(camera);
+        this._probe?.setProjectionType(CameraProjection.PERSPECTIVE);
     }
 
     public readPixels (gfxTexture: Texture): Uint8Array | null {

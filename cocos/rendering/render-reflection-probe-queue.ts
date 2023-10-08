@@ -24,7 +24,7 @@
 
 import { SubModel } from '../render-scene/scene/submodel';
 import { isEnableEffect, SetIndex } from './define';
-import { Device, RenderPass, Shader, CommandBuffer, Texture, SamplerInfo, Address, PipelineState, Attribute, Format, InputAssemblerInfo, BufferInfo, BufferUsageBit, MemoryUsageBit, InputAssembler, Rect, SurfaceTransform } from '../gfx';
+import { Device, RenderPass, Shader, CommandBuffer, Texture, SamplerInfo, Address, PipelineState, Attribute, Format, InputAssemblerInfo, BufferInfo, BufferUsageBit, MemoryUsageBit, InputAssembler, Rect, SurfaceTransform, Viewport } from '../gfx';
 import { getPhaseID } from './pass-phase';
 import { PipelineStateManager } from './pipeline-state-manager';
 import { Pass, BatchingSchemes, IMacroPatch } from '../render-scene/core/pass';
@@ -210,7 +210,7 @@ export class RenderReflectionProbeQueue {
         //this._instancedQueue.clear();
     }
     // eslint-disable-next-line max-len
-    public recordCommandBufferRGBE (device: Device, renderPass: RenderPass, cmdBuff: CommandBuffer, rgbeTex: Texture| null): void {
+    public recordCommandBufferRGBE (camera: Camera, device: Device, renderPass: RenderPass, cmdBuff: CommandBuffer, rgbeTex: Texture| null): void {
         //this._instancedQueue.recordCommandBuffer(device, renderPass, cmdBuff);
         if (!this._bgMat) {
             this._bgMat = new Material();
@@ -234,26 +234,32 @@ export class RenderReflectionProbeQueue {
             // const pass = this._bgMat.passes[0];
             // const shader = pass.getShaderVariant();
 
-            const handle = pass.getBinding('rgbeTex');
-            pass.bindTexture(handle, rgbeTex!);
-            const samplerInfo = new SamplerInfo();
-            samplerInfo.addressU = Address.CLAMP;
-            samplerInfo.addressV = Address.CLAMP;
-            samplerInfo.addressW = Address.CLAMP;
-            pass.bindSampler(handle, device.getSampler(samplerInfo));
+            // const handle = pass.getBinding('rgbeTex');
+            // pass.bindTexture(handle, rgbeTex!);
+            // const samplerInfo = new SamplerInfo();
+            // samplerInfo.addressU = Address.CLAMP;
+            // samplerInfo.addressV = Address.CLAMP;
+            // samplerInfo.addressW = Address.CLAMP;
+            // pass.bindSampler(handle, device.getSampler(samplerInfo));
 
-            const ia1 = this._createQuadInputAssembler();
+            const ia = this._createQuadInputAssembler();
             const vb = this._genQuadVertexData(device, SurfaceTransform.IDENTITY, new Rect(0, 0, 256, 256));
-            ia1.quadVB?.update(vb);
-            //const ia = subModel.inputAssembler;
-            const pso = PipelineStateManager.getOrCreatePipelineState(device, pass, shader, renderPass, ia1.quadIA!);
+            ia.quadVB?.update(vb);
+            const pso = PipelineStateManager.getOrCreatePipelineState(device, pass, shader, renderPass, ia.quadIA!);
             const descriptorSet = pass.descriptorSet;
 
+            const profilerViewport = new Viewport();
+            const profilerScissor = new Rect();
+            profilerViewport.width = profilerScissor.width = 256;
+            profilerViewport.height = profilerScissor.height = 256;
+
+            cmdBuff.setViewport(profilerViewport);
+            cmdBuff.setScissor(profilerScissor);
             cmdBuff.bindPipelineState(pso);
             cmdBuff.bindDescriptorSet(SetIndex.MATERIAL, descriptorSet);
             cmdBuff.bindDescriptorSet(SetIndex.LOCAL, subModel.descriptorSet);
-            cmdBuff.bindInputAssembler(ia1.quadIA!);
-            cmdBuff.draw(ia1.quadIA!);
+            cmdBuff.bindInputAssembler(ia.quadIA!);
+            cmdBuff.draw(ia.quadIA!);
             break;
         }
 

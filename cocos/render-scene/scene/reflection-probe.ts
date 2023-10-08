@@ -132,10 +132,6 @@ export class ReflectionProbe {
         return this._probeType;
     }
 
-    get resolution (): number {
-        return this._resolution;
-    }
-
     /**
      * @en set render texture size
      * @zh 设置渲染纹理大小
@@ -147,6 +143,10 @@ export class ReflectionProbe {
             });
         }
         this._resolution = value;
+    }
+
+    get resolution (): number {
+        return this._resolution;
     }
 
     /**
@@ -198,6 +198,10 @@ export class ReflectionProbe {
         return this._size;
     }
 
+    /**
+     * @en Setting the baked cubemap.
+     * @zh 设置烘焙的cubemap。
+     */
     set cubemap (val: TextureCube | null) {
         this._cubemap = val;
     }
@@ -230,6 +234,10 @@ export class ReflectionProbe {
         return this._needRefresh;
     }
 
+    /**
+     * @en Set whether the reflection probe needs to be rendered.
+     * @zh 设置反射探针是否需要渲染
+     */
     set needRender (value: boolean) {
         this._needRender = value;
     }
@@ -241,6 +249,10 @@ export class ReflectionProbe {
         return this._boundingBox;
     }
 
+    /**
+     * @en Set the camera's node.
+     * @zh 设置相机的node
+     */
     set cameraNode (node: Node) {
         this._cameraNode = node;
     }
@@ -280,22 +292,18 @@ export class ReflectionProbe {
     public initialize (node: Node, cameraNode: Node): void {
         this._node = node;
         this._cameraNode = cameraNode;
+        this._cameraWorldPos = cameraNode.getWorldPosition();
         const pos = this.node.getWorldPosition();
         this._boundingBox = geometry.AABB.create(pos.x, pos.y, pos.z, this._size.x, this._size.y, this._size.z);
         this._createCamera(cameraNode);
     }
 
-    public initBakedTextures (): void {
-        if (this.bakedCubeTextures.length === 0) {
-            for (let i = 0; i < 6; i++) {
-                const renderTexture = this._createTargetTexture(this._resolution, this._resolution);
-                this.bakedCubeTextures.push(renderTexture);
-            }
-        }
-    }
-
+    /**
+     * @en Bake cubemap,internal function called by editor.
+     * @zh 烘焙cubemap，内部函数由编辑器调用
+     */
     public captureCubemap (): void {
-        this.initBakedTextures();
+        this._initBakedTextures();
         this._resetCameraParams();
         this._needRender = true;
     }
@@ -317,6 +325,9 @@ export class ReflectionProbe {
         this._needRender = true;
     }
 
+    /**
+     * @internal
+     */
     public switchProbeType (type: ProbeType, sourceCamera: Camera | null): void {
         if (type === ProbeType.CUBE) {
             this._needRender = false;
@@ -329,6 +340,9 @@ export class ReflectionProbe {
         return this._probeId;
     }
 
+    /**
+     * @internal
+     */
     public updateProbeId (id): void {
         this._probeId = id;
     }
@@ -371,7 +385,12 @@ export class ReflectionProbe {
     public disable (): void {
     }
 
+    /**
+     * @internal
+     */
     public updateCameraDir (faceIdx: number): void {
+        this.cameraNode.worldPosition = this.node.worldPosition;
+        this.cameraNode.worldRotation = this.node.worldRotation;
         this.cameraNode.setRotationFromEuler(cameraDir[faceIdx]);
         this.camera.update(true);
     }
@@ -383,6 +402,9 @@ export class ReflectionProbe {
         }
     }
 
+    /**
+     * @internal
+     */
     public hasFrameBuffer (framebuffer: Framebuffer): boolean {
         if (this.probeType === ProbeType.PLANAR) {
             if (!this.realtimePlanarTexture) return false;
@@ -404,6 +426,37 @@ export class ReflectionProbe {
     public isRGBE (): boolean  {
         //todo: realtime do not use rgbe
         return true;
+    }
+
+    /**
+     * @internal
+     */
+    public setProjectionType (type: CameraProjection): void {
+        this.camera.projectionType = type;
+        if (type === CameraProjection.ORTHO) {
+            this.camera.nearClip = 0;
+            this.camera.orthoHeight = 1;
+        } else {
+            this.camera.nearClip = 0.01;
+        }
+    }
+
+    /**
+     * @internal
+     */
+    public resetCameraTransform (): void {
+        this.cameraNode.worldPosition = Vec3.ZERO;
+        this.cameraNode.worldRotation = Quat.IDENTITY;
+        this.camera.update(true);
+    }
+
+    private _initBakedTextures (): void {
+        if (this.bakedCubeTextures.length === 0) {
+            for (let i = 0; i < 6; i++) {
+                const renderTexture = this._createTargetTexture(this._resolution, this._resolution);
+                this.bakedCubeTextures.push(renderTexture);
+            }
+        }
     }
 
     private _syncCameraParams (camera: Camera): void {
