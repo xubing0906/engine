@@ -60,6 +60,7 @@ export class ReflectionProbeStage extends RenderStage {
     private _probe: ReflectionProbe | null = null;
     private _probeRenderQueue!: RenderReflectionProbeQueue;
     private _rgbeColor = new Vec3();
+    private _rgbeFramebuffer: Framebuffer | null = null;
 
     /**
      * @en Sets the probe info
@@ -80,7 +81,6 @@ export class ReflectionProbeStage extends RenderStage {
     public clearFramebuffer (camera: Camera): void {
         if (!this._frameBuffer) { return; }
 
-        colors[0].w = camera.clearColor.w;
         const pipeline = this._pipeline as ForwardPipeline;
         const pipelineSceneData = pipeline.pipelineSceneData;
         const shadingScale = pipelineSceneData.shadingScale;
@@ -141,22 +141,52 @@ export class ReflectionProbeStage extends RenderStage {
         this._probeRenderQueue.recordCommandBuffer(device, renderPass, cmdBuff);
         cmdBuff.endRenderPass();
 
-        // const srcTex = this._frameBuffer!.colorTextures[0];
-        // const textureRegion = new TextureBlit();
-        // textureRegion.srcExtent.width = srcTex!.width;
-        // textureRegion.srcExtent.height = srcTex!.height;
-        // textureRegion.dstExtent.width = srcTex!.width;
-        // textureRegion.dstExtent.height = srcTex!.height;
+        this.renderRGBE(camera);
 
-        // const rgbeTexture = device.createTexture(new TextureInfo(
-        //     TextureType.TEX2D,
-        //     TextureUsageBit.SAMPLED | TextureUsageBit.TRANSFER_DST,
-        //     Format.RGBA8,
-        //     srcTex!.width,
-        //     srcTex!.height,
-        // ));
+        pipeline.pipelineUBO.updateCameraUBO(camera);
+    }
 
-        // device.commandBuffer.blitTexture(srcTex!, rgbeTexture, [textureRegion], Filter.LINEAR);
+    public renderRGBE (camera: Camera): void {
+        const pipeline = this._pipeline;
+        const cmdBuff = pipeline.commandBuffers[0];
+
+        this._renderArea.x = 0;
+        this._renderArea.y = 0;
+        this._renderArea.width = this._probe!.renderArea().x;
+        this._renderArea.height = this._probe!.renderArea().y;
+
+        const renderPass = this._frameBuffer!.renderPass;
+
+        if (this._probe!.camera.clearFlag & ClearFlagBit.COLOR) {
+            this._rgbeColor.x = this._probe!.camera.clearColor.x;
+            this._rgbeColor.y = this._probe!.camera.clearColor.y;
+            this._rgbeColor.z = this._probe!.camera.clearColor.z;
+            const rgbe = packRGBE(this._rgbeColor);
+            colors[0].x = rgbe.x;
+            colors[0].y = rgbe.y;
+            colors[0].z = rgbe.z;
+            colors[0].w = rgbe.w;
+        }
+        const device = pipeline.device;
+
+        const srcTex = this._frameBuffer!.colorTextures[0];
+        const textureRegion = new TextureBlit();
+        textureRegion.srcExtent.width = srcTex!.width;
+        textureRegion.srcExtent.height = srcTex!.height;
+        textureRegion.dstExtent.width = srcTex!.width;
+        textureRegion.dstExtent.height = srcTex!.height;
+
+        const rgbeTexture = device.createTexture(new TextureInfo(
+            TextureType.TEX2D,
+            TextureUsageBit.SAMPLED | TextureUsageBit.TRANSFER_DST,
+            Format.RGBA8,
+            srcTex!.width,
+            srcTex!.height,
+        ));
+
+        device.commandBuffer.blitTexture(srcTex!, rgbeTexture, [textureRegion], Filter.LINEAR);
+
+        //const buffer = this.readPixels(rgbeTexture);
 
         this._probe?.setProjectionType(CameraProjection.ORTHO);
         this._probe!.resetCameraTransform();
@@ -171,11 +201,9 @@ export class ReflectionProbeStage extends RenderStage {
             camera.clearStencil,
         );
         cmdBuff.bindDescriptorSet(SetIndex.GLOBAL, pipeline.descriptorSet);
-
-        this._probeRenderQueue.recordCommandBufferRGBE(this._probe!.camera, device, renderPass, cmdBuff, null);
+        this._probeRenderQueue.recordCommandBufferRGBE(device, renderPass, cmdBuff, rgbeTexture);
         cmdBuff.endRenderPass();
 
-        pipeline.pipelineUBO.updateCameraUBO(camera);
         this._probe?.setProjectionType(CameraProjection.PERSPECTIVE);
     }
 
