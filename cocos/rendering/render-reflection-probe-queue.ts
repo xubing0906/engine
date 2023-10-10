@@ -91,8 +91,6 @@ export class RenderReflectionProbeQueue {
     private _instancedQueue: RenderInstancedQueue;
     private _patches: IMacroPatch[] = [];
 
-    private _bgMat: Material|null = null;
-
     public constructor (pipeline: PipelineRuntime) {
         this._pipeline = pipeline;
         this._instancedQueue = new RenderInstancedQueue();
@@ -190,7 +188,7 @@ export class RenderReflectionProbeQueue {
      * record CommandBuffer
      */
     public recordCommandBuffer (device: Device, renderPass: RenderPass, cmdBuff: CommandBuffer): void {
-        //this._instancedQueue.recordCommandBuffer(device, renderPass, cmdBuff);
+        this._instancedQueue.recordCommandBuffer(device, renderPass, cmdBuff);
 
         for (let i = 0; i < this._subModelsArray.length; ++i) {
             const subModel = this._subModelsArray[i];
@@ -207,21 +205,11 @@ export class RenderReflectionProbeQueue {
             cmdBuff.draw(ia);
         }
         //this.resetRGBEMacro();
-        //this._instancedQueue.clear();
+        this._instancedQueue.clear();
     }
-    // eslint-disable-next-line max-len
+
     public recordCommandBufferRGBE (device: Device, renderPass: RenderPass, cmdBuff: CommandBuffer, rgbeTex: Texture| null): void {
         //this._instancedQueue.recordCommandBuffer(device, renderPass, cmdBuff);
-        if (!this._bgMat) {
-            this._bgMat = new Material();
-            this._bgMat.initialize({ effectName: 'util/splash-screen' });
-        }
-        // const subModel = this._subModelsArray[i];
-        // const passIdx = getRGBEPassIndex(subModel);
-        // if (passIdx < 0) {
-        //     continue;
-        // }
-
         for (let i = 0; i < this._subModelsArray.length; ++i) {
             const subModel = this._subModelsArray[i];
             const rgbePassIdx = getRGBEPassIndex(subModel);
@@ -230,9 +218,6 @@ export class RenderReflectionProbeQueue {
             }
             const shader = subModel.shaders[rgbePassIdx];
             const pass = subModel.passes[rgbePassIdx];
-
-            // const pass = this._bgMat.passes[0];
-            // const shader = pass.getShaderVariant();
 
             const handle = pass.getBinding('rgbeTex');
             pass.bindTexture(handle, rgbeTex!);
@@ -247,154 +232,58 @@ export class RenderReflectionProbeQueue {
             pass.update();
 
             const ia = this._createQuadInputAssembler();
-            const vb = this._genQuadVertexData(device, SurfaceTransform.IDENTITY, new Rect(0, 0, 256, 256));
-            ia.quadVB?.update(vb);
-            const pso = PipelineStateManager.getOrCreatePipelineState(device, pass, shader, renderPass, ia.quadIA!);
+            const pso = PipelineStateManager.getOrCreatePipelineState(device, pass, shader, renderPass, ia);
             const descriptorSet = pass.descriptorSet;
 
             cmdBuff.bindPipelineState(pso);
             cmdBuff.bindDescriptorSet(SetIndex.MATERIAL, descriptorSet);
             cmdBuff.bindDescriptorSet(SetIndex.LOCAL, subModel.descriptorSet);
-            cmdBuff.bindInputAssembler(ia.quadIA!);
-            cmdBuff.draw(ia.quadIA!);
+            cmdBuff.bindInputAssembler(ia);
+            cmdBuff.draw(ia);
             break;
         }
     }
 
-    private _genQuadVertexData (device: Device, surfaceTransform: SurfaceTransform, renderArea: Rect): Float32Array {
-        const vbData = new Float32Array(4 * 4);
-        const minX = renderArea.x / 256;
-        const maxX = (renderArea.x + renderArea.width) / 256;
-        let minY = renderArea.y / 256;
-        let maxY = (renderArea.y + renderArea.height) / 256;
+    protected _createQuadInputAssembler (): InputAssembler {
+        const device = cclegacy.director.root.device;
+        const minX = 0;
+        const maxX = 1;
+        let minY = 0;
+        let maxY = 1;
         if (device.capabilities.screenSpaceSignY > 0) {
             const temp = maxY;
             maxY       = minY;
             minY       = temp;
         }
-        let n = 0;
-        switch (surfaceTransform) {
-        case (SurfaceTransform.IDENTITY):
-            n = 0;
-            vbData[n++] = -1.0; vbData[n++] = -1.0; vbData[n++] = minX; vbData[n++] = maxY;
-            vbData[n++] = 1.0; vbData[n++] = -1.0; vbData[n++] = maxX; vbData[n++] = maxY;
-            vbData[n++] = -1.0; vbData[n++] = 1.0; vbData[n++] = minX; vbData[n++] = minY;
-            vbData[n++] = 1.0; vbData[n++] = 1.0; vbData[n++] = maxX; vbData[n++] = minY;
-            break;
-        case (SurfaceTransform.ROTATE_90):
-            n = 0;
-            vbData[n++] = -1.0; vbData[n++] = -1.0; vbData[n++] = maxX; vbData[n++] = maxY;
-            vbData[n++] = 1.0; vbData[n++] = -1.0; vbData[n++] = maxX; vbData[n++] = minY;
-            vbData[n++] = -1.0; vbData[n++] = 1.0; vbData[n++] = minX; vbData[n++] = maxY;
-            vbData[n++] = 1.0; vbData[n++] = 1.0; vbData[n++] = minX; vbData[n++] = minY;
-            break;
-        case (SurfaceTransform.ROTATE_180):
-            n = 0;
-            vbData[n++] = -1.0; vbData[n++] = -1.0; vbData[n++] = minX; vbData[n++] = minY;
-            vbData[n++] = 1.0; vbData[n++] = -1.0; vbData[n++] = maxX; vbData[n++] = minY;
-            vbData[n++] = -1.0; vbData[n++] = 1.0; vbData[n++] = minX; vbData[n++] = maxY;
-            vbData[n++] = 1.0; vbData[n++] = 1.0; vbData[n++] = maxX; vbData[n++] = maxY;
-            break;
-        case (SurfaceTransform.ROTATE_270):
-            n = 0;
-            vbData[n++] = -1.0; vbData[n++] = -1.0; vbData[n++] = minX; vbData[n++] = minY;
-            vbData[n++] = 1.0; vbData[n++] = -1.0; vbData[n++] = minX; vbData[n++] = maxY;
-            vbData[n++] = -1.0; vbData[n++] = 1.0; vbData[n++] = maxX; vbData[n++] = minY;
-            vbData[n++] = 1.0; vbData[n++] = 1.0; vbData[n++] = maxX; vbData[n++] = maxY;
-            break;
-        default:
-            break;
-        }
-
-        return vbData;
-    }
-
-    protected _createQuadInputAssembler (): PipelineInputAssemblerData {
-        // create vertex buffer
-        const inputAssemblerData = new PipelineInputAssemblerData();
-
+        const verts = new Float32Array([-1, -1, minX, maxY, 1, -1, maxX, maxY, -1, 1, minX, minY, 1, 1, maxX, minY]);
         const vbStride = Float32Array.BYTES_PER_ELEMENT * 4;
         const vbSize = vbStride * 4;
-        const device = cclegacy.director.root.device;
-        const quadVB = device.createBuffer(new BufferInfo(
+        const vertexBuffers = this._pipeline.device.createBuffer(new BufferInfo(
             BufferUsageBit.VERTEX | BufferUsageBit.TRANSFER_DST,
-            MemoryUsageBit.DEVICE | MemoryUsageBit.HOST,
+            MemoryUsageBit.DEVICE,
             vbSize,
             vbStride,
         ));
-
-        if (!quadVB) {
-            return inputAssemblerData;
-        }
+        vertexBuffers.update(verts);
 
         // create index buffer
-        const ibStride = Uint8Array.BYTES_PER_ELEMENT;
+        const indices = new Uint16Array([0, 1, 2, 1, 3, 2]);
+        const ibStride = Uint16Array.BYTES_PER_ELEMENT;
         const ibSize = ibStride * 6;
-
-        const quadIB = device.createBuffer(new BufferInfo(
+        const indicesBuffers = this._pipeline.device.createBuffer(new BufferInfo(
             BufferUsageBit.INDEX | BufferUsageBit.TRANSFER_DST,
             MemoryUsageBit.DEVICE,
             ibSize,
             ibStride,
         ));
+        indicesBuffers.update(indices);
 
-        if (!quadIB) {
-            return inputAssemblerData;
-        }
-
-        const indices = new Uint8Array(6);
-        indices[0] = 0; indices[1] = 1; indices[2] = 2;
-        indices[3] = 1; indices[4] = 3; indices[5] = 2;
-
-        quadIB.update(indices);
-
-        // create input assembler
-
-        const attributes = new Array<Attribute>(2);
-        attributes[0] = new Attribute('a_position', Format.RG32F);
-        attributes[1] = new Attribute('a_texCoord', Format.RG32F);
-
-        const quadIA = device.createInputAssembler(new InputAssemblerInfo(
-            attributes,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-            [quadVB],
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-            quadIB,
-        ));
-
-        inputAssemblerData.quadIB = quadIB;
-        inputAssemblerData.quadVB = quadVB;
-        inputAssemblerData.quadIA = quadIA;
-        return inputAssemblerData;
-        // const verts = new Float32Array([-0.5, -0.5, 0.0, 0.5, -0.5, 0.0, 0.0,  0.5, 0.0]);
-        // const vbStride = Float32Array.BYTES_PER_ELEMENT * 4;
-        // const vbSize = vbStride * 4;
-        // const vertexBuffers = this._pipeline.device.createBuffer(new BufferInfo(
-        //     BufferUsageBit.VERTEX | BufferUsageBit.TRANSFER_DST,
-        //     MemoryUsageBit.DEVICE,
-        //     vbSize,
-        //     vbStride,
-        // ));
-        // vertexBuffers.update(verts);
-
-        // // create index buffer
-        // const indices = new Uint16Array([0, 1, 2]);
-        // const ibStride = Uint16Array.BYTES_PER_ELEMENT;
-        // const ibSize = ibStride * 3;
-        // const indicesBuffers = this._pipeline.device.createBuffer(new BufferInfo(
-        //     BufferUsageBit.INDEX | BufferUsageBit.TRANSFER_DST,
-        //     MemoryUsageBit.DEVICE,
-        //     ibSize,
-        //     ibStride,
-        // ));
-        // indicesBuffers.update(indices);
-
-        // const attributes: Attribute[] = [
-        //     new Attribute('a_position', Format.RG32F),
-        //     new Attribute('a_texCoord', Format.RG32F),
-        // ];
-        // const IAInfo = new InputAssemblerInfo(attributes, [vertexBuffers], indicesBuffers);
-        // return this._pipeline.device.createInputAssembler(IAInfo);
+        const attributes: Attribute[] = [
+            new Attribute('a_position', Format.RG32F),
+            new Attribute('a_texCoord', Format.RG32F),
+        ];
+        const IAInfo = new InputAssemblerInfo(attributes, [vertexBuffers], indicesBuffers);
+        return this._pipeline.device.createInputAssembler(IAInfo);
     }
     public resetRGBEMacro (): void {
         for (let i = 0; i < this._rgbeSubModelsArray.length; i++) {

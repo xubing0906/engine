@@ -23,18 +23,16 @@
 */
 
 import { ccclass } from 'cc.decorator';
-import { Color, Rect, Framebuffer, ClearFlagBit, Texture, TextureBlit, Filter, TextureInfo, TextureType, TextureUsageBit, Format } from '../../gfx';
+import { Color, Rect, Framebuffer, ClearFlagBit, Texture, TextureBlit, Filter, TextureInfo, TextureType, TextureUsageBit, Format, ColorAttachment, LoadOp, StoreOp, DepthStencilAttachment, RenderPass, RenderPassInfo, FramebufferInfo } from '../../gfx';
 import { IRenderStageInfo, RenderStage } from '../render-stage';
 import { ForwardStagePriority } from '../enum';
 import { ForwardPipeline } from '../forward/forward-pipeline';
 import { SetIndex } from '../define';
 import { ReflectionProbeFlow } from './reflection-probe-flow';
-import { Camera, CameraProjection, CameraUsage, ReflectionProbe } from '../../render-scene/scene';
+import { Camera, CameraProjection, ReflectionProbe } from '../../render-scene/scene';
 import { RenderReflectionProbeQueue } from '../render-reflection-probe-queue';
 import { Vec3 } from '../../core';
 import { packRGBE } from '../../core/math/color';
-import { ImageAsset, Texture2D } from '../../asset/assets';
-import { PixelFormat } from '../../asset/assets/asset-enum';
 import { gfx } from '../../../typedoc-index';
 
 const colors: Color[] = [new Color(1, 1, 1, 1)];
@@ -61,6 +59,12 @@ export class ReflectionProbeStage extends RenderStage {
     private _probeRenderQueue!: RenderReflectionProbeQueue;
     private _rgbeColor = new Vec3();
     private _rgbeFramebuffer: Framebuffer | null = null;
+    private _rgbeRenderPass: RenderPass|null = null;
+
+    public initialize (info: IRenderStageInfo): boolean {
+        super.initialize(info);
+        return true;
+    }
 
     /**
      * @en Sets the probe info
@@ -71,11 +75,14 @@ export class ReflectionProbeStage extends RenderStage {
     public setUsageInfo (probe: ReflectionProbe, frameBuffer: Framebuffer): void {
         this._probe = probe;
         this._frameBuffer = frameBuffer;
+        this._initRGBEFrameBuffer();
     }
 
     public destroy (): void {
         this._frameBuffer = null;
         this._probeRenderQueue?.clear();
+        this._rgbeFramebuffer = null;
+        this._rgbeRenderPass = null;
     }
 
     public clearFramebuffer (camera: Camera): void {
@@ -115,7 +122,9 @@ export class ReflectionProbeStage extends RenderStage {
         this._renderArea.width = this._probe!.renderArea().x;
         this._renderArea.height = this._probe!.renderArea().y;
 
-        const renderPass = this._frameBuffer!.renderPass;
+        //this._clearRGBEFramebuffer(camera);
+
+        const renderPass = this._rgbeFramebuffer!.renderPass;
 
         if (this._probe!.camera.clearFlag & ClearFlagBit.COLOR) {
             this._rgbeColor.x = this._probe!.camera.clearColor.x;
@@ -130,7 +139,7 @@ export class ReflectionProbeStage extends RenderStage {
         const device = pipeline.device;
         cmdBuff.beginRenderPass(
             renderPass,
-            this._frameBuffer!,
+            this._rgbeFramebuffer!,
             this._renderArea,
             colors,
             this._probe!.camera.clearDepth,
@@ -169,25 +178,6 @@ export class ReflectionProbeStage extends RenderStage {
         }
         const device = pipeline.device;
 
-        const srcTex = this._frameBuffer!.colorTextures[0];
-        const textureRegion = new TextureBlit();
-        textureRegion.srcExtent.width = srcTex!.width;
-        textureRegion.srcExtent.height = srcTex!.height;
-        textureRegion.dstExtent.width = srcTex!.width;
-        textureRegion.dstExtent.height = srcTex!.height;
-
-        const rgbeTexture = device.createTexture(new TextureInfo(
-            TextureType.TEX2D,
-            TextureUsageBit.SAMPLED | TextureUsageBit.TRANSFER_DST,
-            Format.RGBA8,
-            srcTex!.width,
-            srcTex!.height,
-        ));
-
-        device.commandBuffer.blitTexture(srcTex!, rgbeTexture, [textureRegion], Filter.LINEAR);
-
-        //const buffer = this.readPixels(rgbeTexture);
-
         this._probe?.setProjectionType(CameraProjection.ORTHO);
         this._probe!.resetCameraTransform();
         pipeline.pipelineUBO.updateCameraUBO(this._probe!.camera);
@@ -201,42 +191,85 @@ export class ReflectionProbeStage extends RenderStage {
             camera.clearStencil,
         );
         cmdBuff.bindDescriptorSet(SetIndex.GLOBAL, pipeline.descriptorSet);
-        this._probeRenderQueue.recordCommandBufferRGBE(device, renderPass, cmdBuff, rgbeTexture);
+        this._probeRenderQueue.recordCommandBufferRGBE(device, renderPass, cmdBuff, this._rgbeFramebuffer!.colorTextures[0]);
         cmdBuff.endRenderPass();
 
         this._probe?.setProjectionType(CameraProjection.PERSPECTIVE);
     }
 
-    public readPixels (gfxTexture: Texture): Uint8Array | null {
-        const width = gfxTexture.width;
-        const height = gfxTexture.height;
-
-        const needSize = 4 * width * height;
-        const buffer = new Uint8Array(needSize);
-
-        if (!gfxTexture) {
-            return null;
-        }
-
-        const gfxDevice = gfx.deviceManager.gfxDevice;
-
-        const bufferViews: ArrayBufferView[] = [];
-        const regions: gfx.BufferTextureCopy[] = [];
-
-        const region0 = new gfx.BufferTextureCopy();
-        region0.texOffset.x = 0;
-        region0.texOffset.y = 0;
-        region0.texExtent.width = gfxTexture.width;
-        region0.texExtent.height = gfxTexture.height;
-        regions.push(region0);
-
-        bufferViews.push(buffer);
-        gfxDevice?.copyTextureToBuffers(gfxTexture, bufferViews, regions);
-        return buffer;
-    }
-
     public activate (pipeline: ForwardPipeline, flow: ReflectionProbeFlow): void {
         super.activate(pipeline, flow);
         this._probeRenderQueue = new RenderReflectionProbeQueue(pipeline);
+    }
+
+    private _initRGBEFrameBuffer (): void {
+        const pipeline = this._pipeline;
+        const device = pipeline.device;
+        const format = Format.RGBA32F;
+
+        if (!this._rgbeRenderPass) {
+            const colorAttachment = new ColorAttachment();
+            colorAttachment.format = format;
+            colorAttachment.loadOp = LoadOp.CLEAR;
+            colorAttachment.storeOp = StoreOp.STORE;
+            colorAttachment.sampleCount = 1;
+
+            const depthStencilAttachment = new DepthStencilAttachment();
+            depthStencilAttachment.format = Format.DEPTH_STENCIL;
+            depthStencilAttachment.depthLoadOp = LoadOp.CLEAR;
+            depthStencilAttachment.depthStoreOp = StoreOp.DISCARD;
+            depthStencilAttachment.stencilLoadOp = LoadOp.CLEAR;
+            depthStencilAttachment.stencilStoreOp = StoreOp.DISCARD;
+            depthStencilAttachment.sampleCount = 1;
+
+            const renderPassInfo = new RenderPassInfo([colorAttachment], depthStencilAttachment);
+            this._rgbeRenderPass = device.createRenderPass(renderPassInfo);
+
+            const renderTargets: Texture[] = [];
+            renderTargets.push(device.createTexture(new TextureInfo(
+                TextureType.TEX2D,
+                TextureUsageBit.COLOR_ATTACHMENT | TextureUsageBit.SAMPLED,
+                format,
+                this._probe!.renderArea().x,
+                this._probe!.renderArea().y,
+            )));
+
+            const depth = device.createTexture(new TextureInfo(
+                TextureType.TEX2D,
+                TextureUsageBit.DEPTH_STENCIL_ATTACHMENT,
+                Format.DEPTH_STENCIL,
+                this._probe!.renderArea().x,
+                this._probe!.renderArea().y,
+            ));
+
+            this._rgbeFramebuffer = device.createFramebuffer(new FramebufferInfo(
+                this._rgbeRenderPass,
+                renderTargets,
+                depth,
+            ));
+        }
+    }
+
+    private _clearRGBEFramebuffer (camera: Camera): void {
+        if (!this._rgbeFramebuffer) { return; }
+
+        const pipeline = this._pipeline as ForwardPipeline;
+
+        this._renderArea.x = 0;
+        this._renderArea.y = 0;
+        this._renderArea.width = this._probe!.renderArea().x;
+        this._renderArea.height = this._probe!.renderArea().y;
+        const cmdBuff = pipeline.commandBuffers[0];
+        const renderPass = this._rgbeFramebuffer.renderPass;
+
+        cmdBuff.beginRenderPass(
+            renderPass,
+            this._rgbeFramebuffer,
+            this._renderArea,
+            colors,
+            camera.clearDepth,
+            camera.clearStencil,
+        );
+        cmdBuff.endRenderPass();
     }
 }

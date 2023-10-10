@@ -4,7 +4,11 @@ layout(location = 0) out vec4 fragColorX;
   void main()  { fragColorX = vec4(0.0, 1.0, 0.0, 1.0); }
 #else
   void main()  {
-    fragColorX = packRGBE(texture(rgbeTex, DEFAULT_UV).rgb);
+
+
+    vec4 color = packRGBE(texture(rgbeTex, DEFAULT_UV).rgb);
+
+    fragColorX = color;
     //fragColorX = packRGBE(vec3(1.0, 0.0, 0.0));
 
   }
