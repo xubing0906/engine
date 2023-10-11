@@ -30,6 +30,7 @@ import { RenderPipeline } from '../render-pipeline';
 import { Camera } from '../../render-scene/scene/camera';
 import { ProbeType, ReflectionProbe } from '../../render-scene/scene/reflection-probe';
 import { cclegacy } from '../../core';
+import { ToneMappingType } from '../../render-scene/scene';
 
 /**
  * @en reflection probe render flow
@@ -84,6 +85,9 @@ export class ReflectionProbeFlow extends RenderFlow {
                 probeStage.render(camera);
                 cclegacy.internal.reflectionProbeManager.updatePlanarMap(probe, probe.realtimePlanarTexture!.getGFXTexture());
             } else {
+                if (probe.renderTransparentObjects) {
+                    this._setToneMappingType(ToneMappingType.LINEAR);
+                }
                 for (let faceIdx = 0; faceIdx < 6; faceIdx++) {
                     const renderTexture = probe.bakedCubeTextures[faceIdx];
                     if (!renderTexture) return;
@@ -92,8 +96,18 @@ export class ReflectionProbeFlow extends RenderFlow {
                     probeStage.setUsageInfo(probe, renderTexture.window!.framebuffer);
                     probeStage.render(camera);
                 }
+                if (probe.renderTransparentObjects) {
+                    this._setToneMappingType(this.pipeline.pipelineSceneData.postSettings.toneMappingType);
+                }
                 probe.needRender = false;
             }
+        }
+    }
+
+    private _setToneMappingType (type: number): void {
+        if (this.pipeline.macros.CC_TONE_MAPPING_TYPE !== type) {
+            this.pipeline.macros.CC_TONE_MAPPING_TYPE = type;
+            cclegacy.director.root.onGlobalPipelineStateChanged();
         }
     }
 }

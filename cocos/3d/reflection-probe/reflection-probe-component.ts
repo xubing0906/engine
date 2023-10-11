@@ -96,6 +96,9 @@ export class ReflectionProbe extends Component {
     @serializable
     private _fastBake = false;
 
+    @serializable
+    private _transpSupport = false;
+
     protected _probe: scene.ReflectionProbe | null = null;
 
     protected _previewSphere: Node | null = null;
@@ -315,6 +318,20 @@ export class ReflectionProbe extends Component {
         return this._previewPlane!;
     }
 
+    /**
+     * @en Render transparent objects.
+     * @zh 渲染透明物体。
+     */
+    @type(CCBoolean)
+    set renderTransparentObjects (val: boolean) {
+        this._probe!.renderTransparentObjects = val;
+        this._transpSupport = val;
+    }
+
+    get renderTransparentObjects (): boolean {
+        return this._transpSupport;
+    }
+
     public onLoad (): void {
         this._createProbe();
         if (EDITOR) {
@@ -429,6 +446,7 @@ export class ReflectionProbe extends Component {
             this._probe.probeType = this._probeType;
             this._probe.size = this._size;
             this._probe.cubemap = this._cubemap!;
+            this._probe.renderTransparentObjects = this._transpSupport;
         }
     }
 }

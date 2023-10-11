@@ -29,7 +29,7 @@ import { ForwardStagePriority } from '../enum';
 import { ForwardPipeline } from '../forward/forward-pipeline';
 import { SetIndex } from '../define';
 import { ReflectionProbeFlow } from './reflection-probe-flow';
-import { Camera, CameraProjection, ReflectionProbe } from '../../render-scene/scene';
+import { Camera, CameraProjection, ReflectionProbe, ToneMappingType } from '../../render-scene/scene';
 import { RenderReflectionProbeQueue } from '../render-reflection-probe-queue';
 import { Vec3 } from '../../core';
 import { packRGBE } from '../../core/math/color';
@@ -121,8 +121,6 @@ export class ReflectionProbeStage extends RenderStage {
         this._renderArea.y = 0;
         this._renderArea.width = this._probe!.renderArea().x;
         this._renderArea.height = this._probe!.renderArea().y;
-
-        //this._clearRGBEFramebuffer(camera);
 
         const renderPass = this._rgbeFramebuffer!.renderPass;
 

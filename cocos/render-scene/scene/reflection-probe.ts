@@ -113,6 +113,8 @@ export class ReflectionProbe {
      */
     private _up = new Vec3();
 
+    private _transpSupport = false;
+
     /**
      * @en Reflection probe cube pattern preview sphere
      * @zh 反射探针cube模式的预览小球
@@ -276,6 +278,7 @@ export class ReflectionProbe {
     /**
      * @en Reflection probe planar mode preview plane
      * @zh 反射探针Planar模式的预览平面
+     * @engineInternal
      */
     set previewPlane (val: Node) {
         this._previewPlane = val;
@@ -283,6 +286,19 @@ export class ReflectionProbe {
 
     get previewPlane (): Node {
         return this._previewPlane!;
+    }
+
+    /**
+     * @en Render transparent objects.
+     * @zh 渲染透明物体。
+     * @engineInternal
+     */
+    set renderTransparentObjects (val: boolean) {
+        this._transpSupport = val;
+    }
+
+    get renderTransparentObjects (): boolean {
+        return this._transpSupport;
     }
 
     constructor (id: number) {
