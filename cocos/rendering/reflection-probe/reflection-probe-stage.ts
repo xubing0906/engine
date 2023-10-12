@@ -33,7 +33,6 @@ import { Camera, CameraProjection, ReflectionProbe, ToneMappingType } from '../.
 import { RenderReflectionProbeQueue } from '../render-reflection-probe-queue';
 import { Vec3 } from '../../core';
 import { packRGBE } from '../../core/math/color';
-import { gfx } from '../../../typedoc-index';
 
 const colors: Color[] = [new Color(1, 1, 1, 1)];
 
@@ -122,7 +121,11 @@ export class ReflectionProbeStage extends RenderStage {
         this._renderArea.width = this._probe!.renderArea().x;
         this._renderArea.height = this._probe!.renderArea().y;
 
-        const renderPass = this._rgbeFramebuffer!.renderPass;
+        let buffer = this._frameBuffer;
+        if (this._probe!.renderTransparents) {
+            buffer =  this._rgbeFramebuffer;
+        }
+        const renderPass = buffer!.renderPass;
 
         if (this._probe!.camera.clearFlag & ClearFlagBit.COLOR) {
             this._rgbeColor.x = this._probe!.camera.clearColor.x;
@@ -137,7 +140,7 @@ export class ReflectionProbeStage extends RenderStage {
         const device = pipeline.device;
         cmdBuff.beginRenderPass(
             renderPass,
-            this._rgbeFramebuffer!,
+            buffer!,
             this._renderArea,
             colors,
             this._probe!.camera.clearDepth,
@@ -148,12 +151,15 @@ export class ReflectionProbeStage extends RenderStage {
         this._probeRenderQueue.recordCommandBuffer(device, renderPass, cmdBuff);
         cmdBuff.endRenderPass();
 
-        this.renderRGBE(camera);
+        //convert to rgbe
+        if (this._probe!.renderTransparents) {
+            this._renderRGBE(camera);
+        }
 
         pipeline.pipelineUBO.updateCameraUBO(camera);
     }
 
-    public renderRGBE (camera: Camera): void {
+    private _renderRGBE (camera: Camera): void {
         const pipeline = this._pipeline;
         const cmdBuff = pipeline.commandBuffers[0];
 
@@ -176,7 +182,7 @@ export class ReflectionProbeStage extends RenderStage {
         }
         const device = pipeline.device;
 
-        this._probe?.setProjectionType(CameraProjection.ORTHO);
+        this._probe!.setProjectionType(CameraProjection.ORTHO);
         this._probe!.resetCameraTransform();
         pipeline.pipelineUBO.updateCameraUBO(this._probe!.camera);
 
@@ -192,7 +198,7 @@ export class ReflectionProbeStage extends RenderStage {
         this._probeRenderQueue.recordCommandBufferRGBE(device, renderPass, cmdBuff, this._rgbeFramebuffer!.colorTextures[0]);
         cmdBuff.endRenderPass();
 
-        this._probe?.setProjectionType(CameraProjection.PERSPECTIVE);
+        this._probe!.setProjectionType(CameraProjection.PERSPECTIVE);
     }
 
     public activate (pipeline: ForwardPipeline, flow: ReflectionProbeFlow): void {
@@ -246,28 +252,5 @@ export class ReflectionProbeStage extends RenderStage {
                 depth,
             ));
         }
-    }
-
-    private _clearRGBEFramebuffer (camera: Camera): void {
-        if (!this._rgbeFramebuffer) { return; }
-
-        const pipeline = this._pipeline as ForwardPipeline;
-
-        this._renderArea.x = 0;
-        this._renderArea.y = 0;
-        this._renderArea.width = this._probe!.renderArea().x;
-        this._renderArea.height = this._probe!.renderArea().y;
-        const cmdBuff = pipeline.commandBuffers[0];
-        const renderPass = this._rgbeFramebuffer.renderPass;
-
-        cmdBuff.beginRenderPass(
-            renderPass,
-            this._rgbeFramebuffer,
-            this._renderArea,
-            colors,
-            camera.clearDepth,
-            camera.clearStencil,
-        );
-        cmdBuff.endRenderPass();
     }
 }

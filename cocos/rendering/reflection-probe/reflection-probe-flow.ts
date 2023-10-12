@@ -85,7 +85,7 @@ export class ReflectionProbeFlow extends RenderFlow {
                 probeStage.render(camera);
                 cclegacy.internal.reflectionProbeManager.updatePlanarMap(probe, probe.realtimePlanarTexture!.getGFXTexture());
             } else {
-                if (probe.renderTransparentObjects) {
+                if (probe.renderTransparents) {
                     this._setToneMappingType(ToneMappingType.LINEAR);
                 }
                 for (let faceIdx = 0; faceIdx < 6; faceIdx++) {
@@ -96,7 +96,7 @@ export class ReflectionProbeFlow extends RenderFlow {
                     probeStage.setUsageInfo(probe, renderTexture.window!.framebuffer);
                     probeStage.render(camera);
                 }
-                if (probe.renderTransparentObjects) {
+                if (probe.renderTransparents) {
                     this._setToneMappingType(this.pipeline.pipelineSceneData.postSettings.toneMappingType);
                 }
                 probe.needRender = false;

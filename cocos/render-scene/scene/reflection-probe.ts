@@ -293,11 +293,11 @@ export class ReflectionProbe {
      * @zh 渲染透明物体。
      * @engineInternal
      */
-    set renderTransparentObjects (val: boolean) {
+    set renderTransparents (val: boolean) {
         this._transpSupport = val;
     }
 
-    get renderTransparentObjects (): boolean {
+    get renderTransparents (): boolean {
         return this._transpSupport;
     }
 

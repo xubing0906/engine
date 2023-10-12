@@ -324,7 +324,7 @@ export class ReflectionProbe extends Component {
      */
     @type(CCBoolean)
     set renderTransparentObjects (val: boolean) {
-        this._probe!.renderTransparentObjects = val;
+        this._probe!.renderTransparents = val;
         this._transpSupport = val;
     }
 
@@ -446,7 +446,7 @@ export class ReflectionProbe extends Component {
             this._probe.probeType = this._probeType;
             this._probe.size = this._size;
             this._probe.cubemap = this._cubemap!;
-            this._probe.renderTransparentObjects = this._transpSupport;
+            this._probe.renderTransparents = this._transpSupport;
         }
     }
 }

@@ -34,8 +34,6 @@ import { Camera, SKYBOX_FLAG } from '../render-scene/scene/camera';
 import { PipelineRuntime } from './custom/pipeline';
 import { RenderInstancedQueue } from './render-instanced-queue';
 import { cclegacy, geometry } from '../core';
-import { Material } from '../asset/assets/material';
-import { PipelineInputAssemblerData } from './render-pipeline';
 
 const CC_USE_RGBE_OUTPUT = 'CC_USE_RGBE_OUTPUT';
 let _phaseID = getPhaseID('default');
@@ -90,12 +88,14 @@ export class RenderReflectionProbeQueue {
     private _rgbeSubModelsArray: SubModel[] = [];
     private _instancedQueue: RenderInstancedQueue;
     private _patches: IMacroPatch[] = [];
+    private _renderTransparents = false;
 
     public constructor (pipeline: PipelineRuntime) {
         this._pipeline = pipeline;
         this._instancedQueue = new RenderInstancedQueue();
     }
     public gatherRenderObjects (probe: ReflectionProbe, camera: Camera, cmdBuff: CommandBuffer): void {
+        this._renderTransparents = probe.renderTransparents;
         this.clear();
         const scene = camera.scene!;
         const sceneData = this._pipeline.pipelineSceneData;
@@ -142,10 +142,10 @@ export class RenderReflectionProbeQueue {
         for (let j = 0; j < subModels.length; j++) {
             const subModel = subModels[j];
 
-            //Filter transparent objects
+            //filter transparent objects
             const isTransparent = subModel.passes[0].blendState.targets[0].blend;
-            if (isTransparent) {
-                //continue;
+            if (isTransparent && !this._renderTransparents) {
+                continue;
             }
 
             let passIdx = getReflectMapPassIndex(subModel);
@@ -156,19 +156,23 @@ export class RenderReflectionProbeQueue {
             }
             if (passIdx < 0) { continue; }
 
+            if (bUseReflectPass && this._renderTransparents) {
+                passIdx = getPassIndex(subModel);
+            }
+
             const pass = subModel.passes[passIdx];
             const batchingScheme = pass.batchingScheme;
 
-            // if (!bUseReflectPass) {
-            //     this._patches = [];
-            //     this._patches = this._patches.concat(subModel.patches!);
-            //     const useRGBEPatchs: IMacroPatch[] = [
-            //         { name: CC_USE_RGBE_OUTPUT, value: true },
-            //     ];
-            //     this._patches = this._patches.concat(useRGBEPatchs);
-            //     subModel.onMacroPatchesStateChanged(this._patches);
-            //     this._rgbeSubModelsArray.push(subModel);
-            // }
+            if (!bUseReflectPass && !this._renderTransparents) {
+                this._patches = [];
+                this._patches = this._patches.concat(subModel.patches!);
+                const useRGBEPatchs: IMacroPatch[] = [
+                    { name: CC_USE_RGBE_OUTPUT, value: true },
+                ];
+                this._patches = this._patches.concat(useRGBEPatchs);
+                subModel.onMacroPatchesStateChanged(this._patches);
+                this._rgbeSubModelsArray.push(subModel);
+            }
 
             if (batchingScheme === BatchingSchemes.INSTANCING) {            // instancing
                 const buffer = pass.getInstancedBuffer();
@@ -204,12 +208,13 @@ export class RenderReflectionProbeQueue {
             cmdBuff.bindInputAssembler(ia);
             cmdBuff.draw(ia);
         }
-        //this.resetRGBEMacro();
+        if (!this._renderTransparents) {
+            this.resetRGBEMacro();
+        }
         this._instancedQueue.clear();
     }
 
     public recordCommandBufferRGBE (device: Device, renderPass: RenderPass, cmdBuff: CommandBuffer, rgbeTex: Texture| null): void {
-        //this._instancedQueue.recordCommandBuffer(device, renderPass, cmdBuff);
         for (let i = 0; i < this._subModelsArray.length; ++i) {
             const subModel = this._subModelsArray[i];
             const rgbePassIdx = getRGBEPassIndex(subModel);
@@ -218,6 +223,8 @@ export class RenderReflectionProbeQueue {
             }
             const shader = subModel.shaders[rgbePassIdx];
             const pass = subModel.passes[rgbePassIdx];
+
+            const isTransparent = pass.blendState.targets[0].blend;
 
             const handle = pass.getBinding('rgbeTex');
             pass.bindTexture(handle, rgbeTex!);

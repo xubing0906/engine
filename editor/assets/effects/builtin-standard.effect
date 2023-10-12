@@ -114,6 +114,7 @@ CCEffect %{
     - *forward-add
     - *shadow-caster
     - *planar-shadow
+    - *convert-rgbe
     - &deferred-forward
       vert: standard-vs
       frag: standard-fs

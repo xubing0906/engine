@@ -48,7 +48,6 @@ layout(location = 0) out vec4 fragColorX;
       CC_APPLY_FOG_BASE(color, fogFactor);
     #endif
 
-    // Color output (RGBE)
-    fragColorX = color;
+    fragColorX = packRGBE(color.rgb);
   }
 #endif
